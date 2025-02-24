@@ -107,7 +107,13 @@ class ForceMove:
             0.0,
             0.0,
             0.0,
+            0.0,
+            0.0,
+            0.0,
             axis_r,
+            0.0,
+            0.0,
+            0.0,
             0.0,
             0.0,
             0.0,
@@ -174,8 +180,11 @@ class ForceMove:
         x = gcmd.get_float("X", curpos[0])
         y = gcmd.get_float("Y", curpos[1])
         z = gcmd.get_float("Z", curpos[2])
-        logging.info("SET_KINEMATIC_POSITION pos=%.3f,%.3f,%.3f", x, y, z)
-        toolhead.set_position([x, y, z, curpos[3]], homing_axes=(0, 1, 2))
+        a = gcmd.get_float("A", curpos[3])
+        b = gcmd.get_float("B", curpos[4])
+        c = gcmd.get_float("C", curpos[5])
+        logging.info("SET_KINEMATIC_POSITION pos=%.3f,%.3f,%.3f", x, y, z, a, b, c)
+        toolhead.set_position([x, y, z, a, b, c, curpos[6]], homing_axes=(0, 1, 2, 3, 4, 5))
 
 
 def load_config(config):
