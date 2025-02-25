@@ -6,6 +6,7 @@
 import math
 import logging
 from .danger_options import get_danger_options
+import support_6axes
 
 # HOMING_START_DELAY = 0.001
 # ENDSTOP_SAMPLE_TIME = 0.000015
@@ -107,6 +108,7 @@ class HomingMove:
         triggered=True,
         check_triggered=True,
     ):
+        movepos = support_6axes.Axes.extend(movepos)
         # Notify start of homing/probing move
         self.printer.send_event("homing:homing_move_begin", self)
         # Note start location
@@ -199,6 +201,7 @@ class HomingMove:
                     for s in kin.get_steppers()
                 }
                 haltpos = self.calc_toolhead_pos(halt_kin_spos, over_steps)
+            haltpos = support_6axes.Axes.extend(haltpos)
             self.toolhead.set_position(haltpos)
         # Signal homing/probing move complete
         try:
@@ -300,6 +303,8 @@ class Homing:
             endstop[0].query_endstop(print_time)
 
     def home_rails(self, rails, forcepos, movepos):
+        forcepos = support_6axes.Axes.extend(forcepos)
+        movepos = support_6axes.Axes.extend(movepos)
         # Notify of upcoming homing operation
         self.printer.send_event("homing:home_rails_begin", self, rails)
         # Alter kinematics class to think printer is at forcepo
