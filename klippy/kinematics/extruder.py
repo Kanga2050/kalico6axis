@@ -16,7 +16,7 @@ class ExtruderSmoother:
         # its derivative at the ends of the smoothing interval
         self.a = [15.0 / 8.0, 0.0, -15.0, 0.0, 30.0]
         self.pa_model = pa_model
-        self.axes = ["x", "y", "z"]
+        self.axes = ["x", "y", "z", "a", "b", "c"]
 
     def update(self, gcmd):
         self.smooth_time = gcmd.get_float("SMOOTH_TIME", self.smooth_time)
@@ -417,7 +417,7 @@ class PrinterExtruder:
     def __init__(self, config, extruder_num):
         self.printer = config.get_printer()
         self.name = config.get_name()
-        self.last_position = [0.0, 0.0, 0.0]
+        self.last_position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         # Setup hotend heater
         pheaters = self.printer.load_object(config, "heaters")
         gcode_id = "T%d" % (extruder_num,)
@@ -522,7 +522,7 @@ class PrinterExtruder:
         return self.heater.stats(eventtime)
 
     def check_move(self, move):
-        axis_r = move.axes_r[3]
+        axis_r = move.axes_r[6]
         if not self.heater.can_extrude:
             raise self.printer.command_error(
                 "Extrude below minimum temp\n"
@@ -530,7 +530,7 @@ class PrinterExtruder:
             )
         if (not move.axes_d[0] and not move.axes_d[1]) or axis_r < 0.0:
             # Extrude only move (or retraction move) - limit accel and velocity
-            if abs(move.axes_d[3]) > self.max_e_dist:
+            if abs(move.axes_d[6]) > self.max_e_dist:
                 raise self.printer.command_error(
                     "Extrude only move too long (%.3fmm vs %.3fmm)\n"
                     "See the 'max_extrude_only_distance' config"
@@ -542,7 +542,7 @@ class PrinterExtruder:
                 self.max_e_accel * inv_extrude_r,
             )
         elif axis_r > self.max_extrude_ratio:
-            if move.axes_d[3] <= self.nozzle_diameter * self.max_extrude_ratio:
+            if move.axes_d[6] <= self.nozzle_diameter * self.max_extrude_ratio:
                 # Permit extrusion if amount extruded is tiny
                 return
             area = axis_r * self.filament_area
@@ -560,13 +560,13 @@ class PrinterExtruder:
             )
 
     def calc_junction(self, prev_move, move):
-        diff_r = move.axes_r[3] - prev_move.axes_r[3]
+        diff_r = move.axes_r[6] - prev_move.axes_r[6]
         if diff_r:
             return (self.instant_corner_v / abs(diff_r)) ** 2
         return move.max_cruise_v2
 
     def move(self, print_time, move):
-        axis_r = move.axes_r[3]
+        axis_r = move.axes_r[6]
         abs_axis_r = abs(axis_r)
         accel = move.accel * abs_axis_r
         start_v = move.start_v * abs_axis_r
@@ -574,10 +574,10 @@ class PrinterExtruder:
         extr_pos = self.last_position
         if move.is_kinematic_move:
             # Regular kinematic move with extrusion
-            extr_r = [math.copysign(r * r, axis_r) for r in move.axes_r[:3]]
+            extr_r = [math.copysign(r * r, axis_r) for r in move.axes_r[:6]]
         else:
             # Extrude-only move, do not apply pressure advance
-            extr_r = [0.0, 0.0, axis_r]
+            extr_r = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.trapq_append(
             self.trapq,
             print_time,
@@ -587,15 +587,21 @@ class PrinterExtruder:
             extr_pos[0],
             extr_pos[1],
             extr_pos[2],
+            extr_pos[3],
+            extr_pos[4],   
+            extr_pos[5],
             extr_r[0],
             extr_r[1],
             extr_r[2],
+            extr_r[3],
+            extr_r[4],
+            extr_r[5],
             start_v,
             cruise_v,
             accel,
         )
-        extr_d = abs(move.axes_d[3])
-        for i in range(3):
+        extr_d = abs(move.axes_d[6])
+        for i in range(6):
             self.last_position[i] += extr_d * extr_r[i]
 
     def find_past_position(self, print_time):
