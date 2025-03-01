@@ -7,7 +7,6 @@ import math, logging, importlib
 from . import chelper
 from .kinematics import extruder
 from .extras.danger_options import get_danger_options
-import support_6axes
 
 # Common suffixes: _d is distance (in mm), _v is velocity (in
 #   mm/second), _v2 is velocity squared (mm^2/s^2), _t is time (in
@@ -17,8 +16,6 @@ import support_6axes
 # Class to track each move request
 class Move:
     def __init__(self, toolhead, start_pos, end_pos, speed):
-        start_pos = support_6axes.Axes.extend(start_pos)
-        end_pos = support_6axes.Axes.extend(end_pos)
         self.toolhead = toolhead
         self.start_pos = tuple(start_pos)
         self.end_pos = tuple(end_pos)
@@ -27,7 +24,7 @@ class Move:
         self.timing_callbacks = []
         velocity = min(speed, toolhead.max_velocity)
         self.is_kinematic_move = True
-        self.axes_d = axes_d = [end_pos[i] - start_pos[i] for i in range(7)]
+        self.axes_d = axes_d = [end_pos[i] - start_pos[i] for i in (0, 1, 2, 3, 4, 5, 6)]
         self.move_d = move_d = math.sqrt(sum([d * d for d in axes_d[:6]]))
         if move_d < 0.000000001:
             # Extrude only move
@@ -598,7 +595,10 @@ class ToolHead:
     def set_position(self, newpos, homing_axes=()):
         self.flush_step_generation()
         ffi_main, ffi_lib = chelper.get_ffi()
-        ffi_lib.trapq_set_position(self.trapq, self.print_time, newpos[0], newpos[1], newpos[2], newpos[3], newpos[4], newpos[5])
+        ffi_lib.trapq_set_position(
+            self.trapq, self.print_time, newpos[0], newpos[1], newpos[2]
+                                        newpos[3], newpos[4], newpos[5]
+        )
         self.commanded_pos[:] = newpos
         self.kin.set_position(newpos, homing_axes)
         self.printer.send_event("toolhead:set_position")
