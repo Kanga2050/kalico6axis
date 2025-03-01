@@ -298,7 +298,6 @@ class ToolHead:
         self.orig_cfg["min_cruise_ratio"] = self.min_cruise_ratio
         self.orig_cfg["square_corner_velocity"] = self.square_corner_velocity
         self.junction_deviation = self.max_accel_to_decel = 0
-        self.is_6axes = config.getboolean('is_6axes', False)
         self._calc_junction_deviation()
         # Input stall detection
         self.check_stall_time = 0.0

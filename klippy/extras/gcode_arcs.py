@@ -169,7 +169,7 @@ class ArcSupport:
         e_per_move = e_base = 0.0
         if asE is not None:
             if absolut_extrude:
-                e_base = currentPos[6]
+                e_base = currentPos[3]
             e_per_move = (asE - e_base) / segments
 
         for i in range(1, int(segments) + 1):
