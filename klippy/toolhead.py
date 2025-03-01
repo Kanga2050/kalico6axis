@@ -24,21 +24,18 @@ class Move:
         self.timing_callbacks = []
         velocity = min(speed, toolhead.max_velocity)
         self.is_kinematic_move = True
-        self.axes_d = axes_d = [end_pos[i] - start_pos[i] for i in (0, 1, 2, 3, 4, 5, 6)]
-        self.move_d = move_d = math.sqrt(sum([d * d for d in axes_d[:6]]))
+        self.axes_d = axes_d = [end_pos[i] - start_pos[i] for i in (0, 1, 2, 3)]
+        self.move_d = move_d = math.sqrt(sum([d * d for d in axes_d[:3]]))
         if move_d < 0.000000001:
             # Extrude only move
             self.end_pos = (
                 start_pos[0],
                 start_pos[1],
                 start_pos[2],
-                start_pos[3],
-                start_pos[4],
-                start_pos[5],
-                end_pos[6],
+                end_pos[3],
             )
-            axes_d[0] = axes_d[1] = axes_d[2] = axes_d[3] = axes_d[4] = axes_d[5] = 0.0
-            self.move_d = move_d = abs(axes_d[6])
+            axes_d[0] = axes_d[1] = axes_d[2] = 0.0
+            self.move_d = move_d = abs(axes_d[3])
             inv_move_d = 0.0
             if move_d:
                 inv_move_d = 1.0 / move_d
@@ -73,7 +70,7 @@ class Move:
 
     def move_error(self, msg="Move out of range"):
         ep = self.end_pos
-        m = "%s: %.3f %.3f %.3f %.3f %.3f %.3f [%.3f]" % (msg, ep[0], ep[1], ep[2], ep[3], ep[4], ep[5], ep[6])
+        m = "%s: %.3f %.3f %.3f [%.3f]" % (msg, ep[0], ep[1], ep[2], ep[3])
         return self.toolhead.printer.command_error(m)
 
     def calc_junction(self, prev_move):
@@ -95,9 +92,6 @@ class Move:
             axes_r[0] * prev_axes_r[0]
             + axes_r[1] * prev_axes_r[1]
             + axes_r[2] * prev_axes_r[2]
-            + axes_r[3] * prev_axes_r[3]
-            + axes_r[4] * prev_axes_r[4]
-            + axes_r[5] * prev_axes_r[5]
         )
         sin_theta_d2 = math.sqrt(max(0.5 * (1.0 - junction_cos_theta), 0.0))
         cos_theta_d2 = math.sqrt(max(0.5 * (1.0 + junction_cos_theta), 0.0))
@@ -269,7 +263,7 @@ class ToolHead:
         self.mcu = self.all_mcus[0]
         self.lookahead = LookAheadQueue(self)
         self.lookahead.set_flush_time(BUFFER_TIME_HIGH)
-        self.commanded_pos = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.commanded_pos = [0.0, 0.0, 0.0, 0.0]
         # Velocity and acceleration control
         self.max_velocity = config.getfloat("max_velocity", above=0.0)
         self.max_accel = config.getfloat("max_accel", above=0.0)
@@ -460,20 +454,14 @@ class ToolHead:
                     move.start_pos[0],
                     move.start_pos[1],
                     move.start_pos[2],
-                    move.start_pos[3],
-                    move.start_pos[4],
-                    move.start_pos[5],
                     move.axes_r[0],
                     move.axes_r[1],
                     move.axes_r[2],
-                    move.axes_r[3],
-                    move.axes_r[4],
-                    move.axes_r[5],
                     move.start_v,
                     move.cruise_v,
                     move.accel,
                 )
-            if move.axes_d[6]:
+            if move.axes_d[3]:
                 self.extruder.move(next_move_time, move)
             next_move_time = (
                 next_move_time + move.accel_t + move.cruise_t + move.decel_t
@@ -597,7 +585,6 @@ class ToolHead:
         ffi_main, ffi_lib = chelper.get_ffi()
         ffi_lib.trapq_set_position(
             self.trapq, self.print_time, newpos[0], newpos[1], newpos[2]
-                                        newpos[3], newpos[4], newpos[5]
         )
         self.commanded_pos[:] = newpos
         self.kin.set_position(newpos, homing_axes)
@@ -614,7 +601,7 @@ class ToolHead:
             return
         if move.is_kinematic_move:
             self.kin.check_move(move)
-        if move.axes_d[6]:
+        if move.axes_d[3]:
             self.extruder.check_move(move)
         self.commanded_pos[:] = move.end_pos
         self.lookahead.add_move(move)
@@ -647,7 +634,7 @@ class ToolHead:
 
     def set_extruder(self, extruder, extrude_pos):
         self.extruder = extruder
-        self.commanded_pos[6] = extrude_pos
+        self.commanded_pos[3] = extrude_pos
 
     def get_extruder(self):
         return self.extruder
