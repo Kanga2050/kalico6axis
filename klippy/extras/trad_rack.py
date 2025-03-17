@@ -2387,10 +2387,11 @@ class TradRackToolHead(toolhead.ToolHead, object):
         self.trapq_append = ffi_lib.trapq_append
         self.trapq_finalize_moves = ffi_lib.trapq_finalize_moves
         self.step_generators = []
+        self.flush_trapqs = [self.trapq]
         # Create kinematic class
         gcode = self.printer.lookup_object("gcode")
         self.Coord = gcode.Coord
-        self.extruder = extruder.DummyExtruder(self.printer)
+        self.extra_axes = [extruder.DummyExtruder(self.printer)]
         try:
             self.kin = TradRackKinematics(self, config, is_extruder_synced)
         except config.error as e:
