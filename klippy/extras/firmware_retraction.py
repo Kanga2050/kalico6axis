@@ -294,12 +294,8 @@ class FirmwareRetraction:
         ):
             self._execute_clear_z_hop()
 
-        adjusted_pos = [
-            newpos[0],
-            newpos[1],
-            newpos[2] + self.current_z_hop_height,
-            newpos[3],
-        ]
+        adjusted_pos = list(newpos)
+        adjusted_pos[2] += self.current_z_hop_height
         self.next_transform.move(adjusted_pos, speed)
         self.last_position[:] = newpos
 

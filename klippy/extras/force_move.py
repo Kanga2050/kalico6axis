@@ -175,7 +175,7 @@ class ForceMove:
         y = gcmd.get_float("Y", curpos[1])
         z = gcmd.get_float("Z", curpos[2])
         logging.info("SET_KINEMATIC_POSITION pos=%.3f,%.3f,%.3f", x, y, z)
-        toolhead.set_position([x, y, z, curpos[3]], homing_axes=(0, 1, 2))
+        toolhead.set_position([x, y, z], homing_axes=(0, 1, 2))
 
 
 def load_config(config):
