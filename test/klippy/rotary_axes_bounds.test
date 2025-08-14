@@ -1,0 +1,9 @@
+# Test bounds checks on manual_stepper gcode axes
+CONFIG rotary_axes.cfg
+DICTIONARY atmega2560.dict
+SHOULD_FAIL
+
+G28
+MANUAL_STEPPER STEPPER=a SET_POSITION=0
+MANUAL_STEPPER STEPPER=a GCODE_AXIS=A
+G1 A101

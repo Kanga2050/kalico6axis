@@ -1,0 +1,11 @@
+# Test case for the corexy 5 axis example config
+CONFIG ../../config/example-corexy-5axis.cfg
+DICTIONARY atmega2560.dict
+
+G4 P200
+G28
+HOME_AC
+G1 X100 Y100 Z10 A30 C90 F6000
+G1 X120 A-30 C450
+G1 A0 C0
+M84
