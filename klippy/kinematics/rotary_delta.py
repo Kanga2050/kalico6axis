@@ -208,7 +208,9 @@ class RotaryDeltaCalibration:
             for a, ua, la in zip(angles, upper_arms, lower_arms)
         ]
         self.abs_endstops = [
-            self.ffi_lib.itersolve_calc_position_from_coord(sk, 0.0, 0.0, es)
+            self.ffi_lib.itersolve_calc_position_from_coord(
+                sk, 0.0, 0.0, es, 0.0, 0.0, 0.0
+            )
             for sk, es in zip(self.sks, endstops)
         ]
 
@@ -278,7 +280,7 @@ class RotaryDeltaCalibration:
         # Return a stable_position from a cartesian coordinate
         pos = [
             self.ffi_lib.itersolve_calc_position_from_coord(
-                sk, coord[0], coord[1], coord[2]
+                sk, coord[0], coord[1], coord[2], 0.0, 0.0, 0.0
             )
             for sk in self.sks
         ]

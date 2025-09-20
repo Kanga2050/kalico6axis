@@ -198,17 +198,22 @@ class MCU_stepper:
         ffi_lib.stepcompress_set_invert_sdir(self._stepqueue, invert_dir)
         self._mcu.get_printer().send_event("stepper:set_dir_inverted", self)
 
+    def _get_pose(self, coord):
+        if len(coord) >= 6:
+            return tuple(coord[:6])
+        return tuple(coord[:3]) + (0.0, 0.0, 0.0)
+
     def calc_position_from_coord(self, coord):
         ffi_main, ffi_lib = chelper.get_ffi()
         return ffi_lib.itersolve_calc_position_from_coord(
-            self._stepper_kinematics, coord[0], coord[1], coord[2]
+            self._stepper_kinematics, *self._get_pose(coord)
         )
 
     def set_position(self, coord):
         mcu_pos = self.get_mcu_position()
         sk = self._stepper_kinematics
         ffi_main, ffi_lib = chelper.get_ffi()
-        ffi_lib.itersolve_set_position(sk, coord[0], coord[1], coord[2])
+        ffi_lib.itersolve_set_position(sk, *self._get_pose(coord))
         self._set_mcu_position(mcu_pos)
 
     def get_commanded_position(self):

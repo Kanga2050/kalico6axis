@@ -2384,10 +2384,12 @@ class TradRackToolHead(toolhead.ToolHead, object):
         # Setup iterative solver
         ffi_main, ffi_lib = chelper.get_ffi()
         self.trapq = ffi_main.gc(ffi_lib.trapq_alloc(), ffi_lib.trapq_free)
-        self.trapq_append = ffi_lib.trapq_append
+        self.trapq_append = ffi_lib.trapq_append_pose
         self.trapq_finalize_moves = ffi_lib.trapq_finalize_moves
         self.step_generators = []
         self.flush_trapqs = [self.trapq]
+        self.rotary_slots = [None, None, None]
+        self.rotary_axes = []
         # Create kinematic class
         gcode = self.printer.lookup_object("gcode")
         self.Coord = gcode.Coord

@@ -315,10 +315,12 @@ class ToolHead:
         # Setup iterative solver
         ffi_main, ffi_lib = chelper.get_ffi()
         self.trapq = ffi_main.gc(ffi_lib.trapq_alloc(), ffi_lib.trapq_free)
-        self.trapq_append = ffi_lib.trapq_append
+        self.trapq_append = ffi_lib.trapq_append_pose
         self.trapq_finalize_moves = ffi_lib.trapq_finalize_moves
         self.step_generators = []
         self.flush_trapqs = [self.trapq]
+        self.rotary_slots = [None, None, None]
+        self.rotary_axes = []
         # Create kinematics class
         gcode = self.printer.lookup_object("gcode")
         self.Coord = gcode.Coord
@@ -451,12 +453,8 @@ class ToolHead:
                     move.accel_t,
                     move.cruise_t,
                     move.decel_t,
-                    move.start_pos[0],
-                    move.start_pos[1],
-                    move.start_pos[2],
-                    move.axes_r[0],
-                    move.axes_r[1],
-                    move.axes_r[2],
+                    *self.get_pose(move.start_pos),
+                    *self.get_pose(move.axes_r),
                     move.start_v,
                     move.cruise_v,
                     move.accel,
@@ -584,10 +582,13 @@ class ToolHead:
     def set_position(self, newpos, homing_axes=()):
         self.flush_step_generation()
         ffi_main, ffi_lib = chelper.get_ffi()
-        ffi_lib.trapq_set_position(
-            self.trapq, self.print_time, newpos[0], newpos[1], newpos[2]
-        )
         self.commanded_pos[:3] = newpos[:3]
+        for i in self.rotary_axes:
+            if i < len(newpos):
+                self.commanded_pos[i] = newpos[i]
+        ffi_lib.trapq_set_position(
+            self.trapq, self.print_time, *self.get_pose(self.commanded_pos)
+        )
         self.kin.set_position(newpos, homing_axes)
         self.printer.send_event("toolhead:set_position")
 
@@ -670,6 +671,19 @@ class ToolHead:
 
     def get_extra_axes(self):
         return [None, None, None] + self.extra_axes
+
+    def add_rotary_axis(self, ea, slot, axis_pos):
+        self.extra_axes.append(ea)
+        self.commanded_pos.append(axis_pos)
+        self.rotary_slots[slot] = len(self.commanded_pos) - 1
+        self.rotary_axes.append(self.rotary_slots[slot])
+
+    def get_pose(self, pos=None):
+        if pos is None:
+            pos = self.commanded_pos
+        return tuple(pos[:3]) + tuple(
+            0.0 if i is None else pos[i] for i in self.rotary_slots
+        )
 
     # Homing "drip move" handling
     def _update_drip_move_time(self, next_print_time):
