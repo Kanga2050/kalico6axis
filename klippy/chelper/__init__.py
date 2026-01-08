@@ -37,6 +37,7 @@ SOURCE_FILES = [
     "kin_deltesian.c",
     "kin_polar.c",
     "kin_rotary_delta.c",
+    "kin_rotary_table.c",
     "kin_winch.c",
     "kin_extruder.c",
     "kin_shaper.c",
@@ -172,6 +173,11 @@ defs_kin_rotary_delta = """
         , double angle, double upper_arm, double lower_arm);
 """
 
+defs_kin_rotary_table = """
+    struct stepper_kinematics *rotary_table_stepper_alloc(char type
+        , double cx, double cy, double ay, double az);
+"""
+
 defs_kin_winch = """
     struct stepper_kinematics *winch_stepper_alloc(double anchor_x
         , double anchor_y, double anchor_z);
@@ -284,6 +290,7 @@ defs_all = [
     defs_kin_deltesian,
     defs_kin_polar,
     defs_kin_rotary_delta,
+    defs_kin_rotary_table,
     defs_kin_winch,
     defs_kin_extruder,
     defs_kin_shaper,
