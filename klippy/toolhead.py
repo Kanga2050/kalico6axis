@@ -30,13 +30,15 @@ class Move:
             # Extrude only move
             self.end_pos = tuple(start_pos[:3]) + self.end_pos[3:]
             axes_d[0] = axes_d[1] = axes_d[2] = 0.0
-            self.move_d = move_d = max([abs(ad) for ad in axes_d[3:]])
+            rot_d = max([abs(axes_d[i]) for i in toolhead.rotary_axes] + [0.0])
+            self.move_d = move_d = rot_d or max([abs(d) for d in axes_d[3:]])
             inv_move_d = 0.0
             if move_d:
                 inv_move_d = 1.0 / move_d
-            self.accel = 99999999.9
-            velocity = speed
-            self.is_kinematic_move = False
+            if not rot_d:
+                self.accel = 99999999.9
+                velocity = speed
+                self.is_kinematic_move = False
         else:
             inv_move_d = 1.0 / move_d
         self.axes_r = [d * inv_move_d for d in axes_d]

@@ -573,7 +573,7 @@ class PrinterExtruder:
         start_v = move.start_v * abs_axis_r
         cruise_v = move.cruise_v * abs_axis_r
         extr_pos = self.last_position
-        if move.is_kinematic_move:
+        if any(move.axes_r[:3]):
             # Regular kinematic move with extrusion
             extr_r = [math.copysign(r * r, axis_r) for r in move.axes_r[:3]]
         else:
