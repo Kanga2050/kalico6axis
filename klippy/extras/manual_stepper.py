@@ -240,6 +240,9 @@ class ManualStepper:
     def get_position(self):
         return [self.rail.get_commanded_position(), 0.0, 0.0, 0.0]
 
+    def get_pose(self, pos):
+        return pos
+
     def set_position(self, newpos, homing_axes=()):
         self.do_set_position(newpos[0])
 

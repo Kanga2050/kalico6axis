@@ -78,8 +78,12 @@ class HomingMove:
             [
                 (
                     abs(
-                        s.calc_position_from_coord(startpos)
-                        - s.calc_position_from_coord(movepos)
+                        s.calc_position_from_coord(
+                            self.toolhead.get_pose(startpos)
+                        )
+                        - s.calc_position_from_coord(
+                            self.toolhead.get_pose(movepos)
+                        )
                     )
                     / s.get_step_dist()
                 )
