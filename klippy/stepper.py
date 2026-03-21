@@ -391,7 +391,9 @@ def parse_step_distance(config, units_in_radians=None, note_valid=False):
         rd = config.get("rotation_distance", None, note_valid=False)
         gr = config.get("gear_ratio", None, note_valid=False)
         units_in_radians = rd is None and gr is not None
-    if units_in_radians:
+    if config.get_name().startswith("rotary_"):
+        rotation_dist = 360.0
+    elif units_in_radians:
         rotation_dist = 2.0 * math.pi
         config.get("gear_ratio", note_valid=note_valid)
     else:
