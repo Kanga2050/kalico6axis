@@ -614,6 +614,72 @@ max_z_accel:
 [stepper_z]
 ```
 
+### CoreXY AC Kinematics
+
+See [example-corexy-ac.cfg](../config/example-corexy-ac.cfg) for an
+example corexy printer with a rotary table that tilts around the X
+axis (A) and spins around the Z axis (C).
+
+The rotary table uses tool center point control: `G1` X, Y and Z
+coordinates describe the nozzle position relative to the part on the
+table, and the printer moves the gantry so that the nozzle stays on
+that point while A and C rotate. Feedrates and extrusion are relative
+to the part. Moves that only rotate the table use the rotation (in
+degrees) as the move distance. With A and C at zero the part
+coordinates match the machine coordinates. A positive rotation turns
+the table counter-clockwise when looking from the positive end of
+its axis towards the origin. The A and C positions are not homed; use
+`SET_KINEMATIC_POSITION A=<angle> C=<angle>` to define them. The
+table must be at A=0 and C=0 (or a multiple of 360) to home X, Y or Z.
+
+Only parameters specific to these printers are described here - see
+[corexy kinematics](#corexy-kinematics) for the remaining parameters.
+
+```
+[printer]
+kinematics: corexy_ac
+
+# The rotary_a section describes the stepper that tilts the table
+# around an axis parallel to X.
+[rotary_a]
+#step_pin:
+#dir_pin:
+#enable_pin:
+#microsteps:
+#full_steps_per_rotation:
+#gear_ratio:
+#   See the "stepper" section for a description of these parameters.
+#   Rotary steppers are specified in degrees, so there is no
+#   rotation_distance parameter. Use gear_ratio to describe any
+#   gearing between the motor and the table.
+pivot:
+#   The Y and Z machine position (in mm) of the A rotation axis. This
+#   parameter must be provided.
+max_velocity:
+#   Maximum rotational velocity (in degrees/s). This parameter must
+#   be provided.
+max_accel:
+#   Maximum rotational acceleration (in degrees/s^2). This parameter
+#   must be provided.
+#instantaneous_corner_velocity: 1.0
+#   The maximum instantaneous velocity change (in degrees/s) of the
+#   axis during the junction of two moves.
+#position_min:
+#position_max:
+#   The range (in degrees) the axis may be commanded to. The default
+#   is to not limit the axis, which allows continuous rotation.
+
+# The rotary_c section describes the stepper that spins the table
+# around an axis parallel to Z. It supports the same parameters as
+# the rotary_a section.
+[rotary_c]
+pivot:
+#   The X and Y machine position (in mm) of the C rotation axis when
+#   the A axis is at zero. This parameter must be provided.
+max_velocity:
+max_accel:
+```
+
 ### ⚠️ CoreXY Kinematics with limits for X and Y axes
 
 Behaves exactly the as CoreXY kinematics, but allows to set a acceleration limit

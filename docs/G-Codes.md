@@ -738,9 +738,11 @@ state; issue a G28 afterwards to reset the kinematics. This command is
 intended for low-level diagnostics and debugging.
 
 #### SET_KINEMATIC_POSITION
-`SET_KINEMATIC_POSITION [X=<value>] [Y=<value>] [Z=<value>]`: Force
-the low-level kinematic code to believe the toolhead is at the given
-cartesian position. This is a diagnostic and debugging command; use
+`SET_KINEMATIC_POSITION [X=<value>] [Y=<value>] [Z=<value>]
+[A=<value>] [C=<value>]`: Force the low-level kinematic code to
+believe the toolhead is at the given cartesian position. On printers
+with a rotary table the A and C parameters set the rotary table
+angles. This is a diagnostic and debugging command; use
 SET_GCODE_OFFSET and/or G92 for regular axis transformations. If an
 axis is not specified then it will default to the position that the
 head was last commanded to. Setting an incorrect or invalid position
