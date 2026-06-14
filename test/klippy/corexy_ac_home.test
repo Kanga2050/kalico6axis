@@ -1,0 +1,8 @@
+# Test that homing is rejected while the rotary table is rotated
+CONFIG corexy_ac.cfg
+DICTIONARY atmega2560.dict
+SHOULD_FAIL
+
+G28
+G1 X100 Y100 Z50 A20
+G28 X

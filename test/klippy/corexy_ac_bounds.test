@@ -1,0 +1,8 @@
+# Test that rotation moving the machine out of range is rejected
+CONFIG corexy_ac.cfg
+DICTIONARY atmega2560.dict
+SHOULD_FAIL
+
+G28
+G1 X100 Y190 Z10
+G1 A-90
