@@ -47,8 +47,7 @@ class SafeZHoming:
                 pos[2] = 0
                 toolhead.set_position(pos, homing_axes=[2])
                 toolhead.manual_move([None, None, self.z_hop], self.z_hop_speed)
-                if hasattr(toolhead.get_kinematics(), "note_z_not_homed"):
-                    toolhead.get_kinematics().note_z_not_homed()
+                toolhead.get_kinematics().clear_homing_state((2,))
             elif pos[2] < self.z_hop:
                 # If the Z axis is homed, and below z_hop, lift it to z_hop
                 toolhead.manual_move([None, None, self.z_hop], self.z_hop_speed)
@@ -87,6 +86,11 @@ class SafeZHoming:
                 or "y" not in kin_status["homed_axes"]
             ):
                 raise gcmd.error("Must home X and Y axes first")
+
+            # Do we need to detach the probe?
+            dockable = self.printer.lookup_object("dockable_probe", None)
+            if dockable is not None and dockable.detach_dockable_before_z_home:
+                dockable.detach_probe()
 
             # Move to safe XY homing position
             prevpos = toolhead.get_position()

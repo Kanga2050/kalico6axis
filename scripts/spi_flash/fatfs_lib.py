@@ -4,8 +4,8 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 import os
-import sys
 import pathlib
+import sys
 
 KLIPPER_DIR = pathlib.Path(__file__).parent.parent.parent
 sys.path.insert(0, str(KLIPPER_DIR))
@@ -69,10 +69,10 @@ def check_fatfs_build(printfunc=lambda o: o):
     ofiles.extend(chelper.get_abs_files(srcdir, SPI_FLASH_HEADERS))
     destlib = os.path.join(srcdir, DEST_LIB)
     if chelper.check_build_code(srcfiles + ofiles + [__file__], destlib):
-        if chelper.check_gcc_option(chelper.SSE_FLAGS):
+        if chelper.check_gcc_option(chelper.NATIVE_FLAGS):
             cmd = "%s %s %s" % (
                 chelper.GCC_CMD,
-                chelper.SSE_FLAGS,
+                chelper.NATIVE_FLAGS,
                 chelper.COMPILE_ARGS,
             )
         else:

@@ -4,6 +4,7 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 from klippy import stepper
+
 from . import idex_modes
 
 
@@ -92,8 +93,12 @@ class CartKinematics:
             self.limits[axis] = rail.get_range()
 
     def note_z_not_homed(self):
-        # Helper for Safe Z Home
-        self.limits[2] = (1.0, -1.0)
+        self.clear_homing_state([2])
+
+    def clear_homing_state(self, axes):
+        for i, _ in enumerate(self.limits):
+            if i in axes:
+                self.limits[i] = (1.0, -1.0)
 
     def home_axis(self, homing_state, axis, rail):
         # Determine movement
@@ -118,7 +123,7 @@ class CartKinematics:
                 self.home_axis(homing_state, axis, self.rails[axis])
 
     def _motor_off(self, print_time):
-        self.limits = [(1.0, -1.0)] * 3
+        self.clear_homing_state((0, 1, 2))
 
     def _check_endstops(self, move):
         end_pos = move.end_pos

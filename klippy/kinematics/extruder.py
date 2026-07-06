@@ -3,14 +3,21 @@
 # Copyright (C) 2016-2022  Kevin O'Connor <kevin@koconnor.net>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import math, logging
-from klippy import stepper, chelper
+import logging
+import math
+
+from klippy import chelper, stepper
+
+from ..extras.danger_options import get_danger_options
 
 
 class ExtruderSmoother:
     def __init__(self, config, pa_model):
         self.smooth_time = config.getfloat(
-            "pressure_advance_smooth_time", 0.040, above=0.0, maxval=0.200
+            "pressure_advance_smooth_time",
+            0.040,
+            above=0.0,
+            maxval=get_danger_options().override_pressure_advance_smooth_time_max,
         )
         # A 4-th order smoothing function that goes to 0 together with
         # its derivative at the ends of the smoothing interval
@@ -19,7 +26,12 @@ class ExtruderSmoother:
         self.axes = ["x", "y", "z"]
 
     def update(self, gcmd):
-        self.smooth_time = gcmd.get_float("SMOOTH_TIME", self.smooth_time)
+        self.smooth_time = gcmd.get_float(
+            "SMOOTH_TIME",
+            self.smooth_time,
+            minval=0.0,
+            maxval=get_danger_options().override_pressure_advance_smooth_time_max,
+        )
 
     def update_pa_model(self, pa_model):
         self.pa_model = pa_model
@@ -93,10 +105,10 @@ class PANonLinearModel:
             self.linear_advance = config.getfloat(
                 "linear_advance", 0.0, minval=0.0
             )
-            self.linear_offset = config.getfloat(
-                "linear_offset", 0.0, minval=0.0
+            self.nonlinear_offset = config.getfloat(
+                "nonlinear_offset", 0.0, minval=0.0
             )
-            if self.linear_offset:
+            if self.nonlinear_offset:
                 self.linearization_velocity = config.getfloat(
                     "linearization_velocity", above=0.0
                 )
@@ -106,52 +118,52 @@ class PANonLinearModel:
                 )
         else:
             self.linear_advance = 0.0
-            self.linear_offset = 0.0
+            self.nonlinear_offset = 0.0
             self.linearization_velocity = 0.0
 
     def update(self, gcmd):
         self.linear_advance = gcmd.get_float(
             "ADVANCE", self.linear_advance, minval=0.0
         )
-        self.linear_offset = gcmd.get_float(
-            "OFFSET", self.linear_offset, minval=0.0
+        self.nonlinear_offset = gcmd.get_float(
+            "OFFSET", self.nonlinear_offset, minval=0.0
         )
         self.linearization_velocity = gcmd.get_float(
             "VELOCITY", self.linearization_velocity
         )
-        if self.linear_offset and self.linearization_velocity <= 0.0:
+        if self.nonlinear_offset and self.linearization_velocity <= 0.0:
             raise gcmd.error(
                 "VELOCITY must be set to a positive value "
                 "when OFFSET is non-zero"
             )
 
     def enabled(self):
-        return self.linear_advance > 0.0 or self.linear_offset > 0.0
+        return self.linear_advance > 0.0 or self.nonlinear_offset > 0.0
 
     def get_pa_params(self):
         # The order must match the order of parameters in the
         # pressure_advance_params struct in kin_extruder.c
         return (
             self.linear_advance,
-            self.linear_offset,
+            self.nonlinear_offset,
             self.linearization_velocity,
         )
 
     def get_status(self, eventtime):
         return {
             "linear_advance": self.linear_advance,
-            "linear_offset": self.linear_offset,
+            "nonlinear_offset": self.nonlinear_offset,
             "linearization_velocity": self.linearization_velocity,
         }
 
     def get_msg(self):
         return (
             "linear_advance: %.6f\n"
-            "linear_offset: %.6f\n"
+            "nonlinear_offset: %.6f\n"
             "linearization_velocity: %.6f"
             % (
                 self.linear_advance,
-                self.linear_offset,
+                self.nonlinear_offset,
                 self.linearization_velocity,
             )
         )
@@ -366,15 +378,17 @@ class ExtruderStepper:
             maxval=0.2,
         )
         self._update_pressure_advance(pa_model, time_offset)
-        msg = (
-            "pressure_advance_model: %s\n" % (pa_model.name,)
-            + pa_model.get_msg()
-            + "\n"
-            + self.smoother.get_msg()
-            + "\npressure_advance_time_offset: %.6f" % (time_offset,)
-        )
-        self.printer.set_rollover_info(self.name, "%s: %s" % (self.name, msg))
-        gcmd.respond_info(msg, log=False)
+        if get_danger_options().log_pressure_advance_changes:
+            msg = (
+                "pressure_advance_model: %s" % pa_model.name,
+                pa_model.get_msg(),
+                self.smoother.get_msg(),
+                "pressure_advance_time_offset: %.6f" % time_offset,
+            )
+            self.printer.set_rollover_info(
+                self.name, "%s: %s" % (self.name, (" ".join(msg)))
+            )
+            gcmd.respond_info("\n".join(msg), log=False)
 
     cmd_SET_E_ROTATION_DISTANCE_help = "Set extruder rotation distance"
 
@@ -459,10 +473,6 @@ class PrinterExtruder:
         self.trapq_append = ffi_lib.trapq_append
         self.trapq_finalize_moves = ffi_lib.trapq_finalize_moves
 
-        self.per_move_pressure_advance = config.getboolean(
-            "per_move_pressure_advance", False
-        )
-
         # Setup extruder stepper
         self.extruder_steppers = []
         if (
@@ -477,6 +487,7 @@ class PrinterExtruder:
             toolhead.set_extruder(self, 0.0)
             gcode.register_command("M104", self.cmd_M104)
             gcode.register_command("M109", self.cmd_M109)
+            gcode.register_command("M302", self.cmd_M302)
         gcode.register_mux_command(
             "ACTIVATE_EXTRUDER",
             "EXTRUDER",
@@ -625,6 +636,24 @@ class PrinterExtruder:
     def cmd_M109(self, gcmd):
         # Set Extruder Temperature and Wait
         self.cmd_M104(gcmd, wait=True)
+
+    def cmd_M302(self, gcmd):
+        index = gcmd.get_int("T", None, minval=0)
+        if index is not None:
+            section = "extruder"
+            if index:
+                section = "extruder%d" % (index,)
+            extruder = self.printer.lookup_object(section, None)
+            if extruder is None:
+                raise gcmd.error("Extruder%d not configured", (index,))
+        else:
+            extruder = self.printer.lookup_object("toolhead").get_extruder()
+        heater = extruder.get_heater()
+        cold_extrude = gcmd.get_int("P", None, minval=0, maxval=1)
+        min_extrude_temp = gcmd.get_float(
+            "S", None, minval=heater.min_temp, maxval=heater.max_temp
+        )
+        heater.set_cold_extrude(cold_extrude, min_extrude_temp)
 
     cmd_ACTIVATE_EXTRUDER_help = "Change the active extruder"
 

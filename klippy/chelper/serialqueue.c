@@ -12,7 +12,9 @@
 // clock times, prioritizes commands, and handles retransmissions.  A
 // background thread is launched to do this work and minimize latency.
 
+#ifndef __APPLE__
 #include <linux/can.h> // // struct can_frame
+#endif
 #include <math.h> // fabs
 #include <pthread.h> // pthread_mutex_lock
 #include <stddef.h> // offsetof
@@ -89,7 +91,7 @@ struct serialqueue {
 #define MIN_RTO 0.025
 #define MAX_RTO 5.000
 #define MAX_PENDING_BLOCKS 12
-#define MIN_REQTIME_DELTA 0.250
+#define MIN_REQTIME_DELTA 0.100
 #define MIN_BACKGROUND_DELTA 0.005
 #define IDLE_QUERY_TIME 1.0
 
@@ -300,6 +302,7 @@ static void
 input_event(struct serialqueue *sq, double eventtime)
 {
     if (sq->serial_fd_type == SQT_CAN) {
+#ifndef __APPLE__
         struct can_frame cf;
         int ret = read(sq->serial_fd, &cf, sizeof(cf));
         if (ret <= 0) {
@@ -311,6 +314,9 @@ input_event(struct serialqueue *sq, double eventtime)
             return;
         memcpy(&sq->input_buf[sq->input_pos], cf.data, cf.can_dlc);
         sq->input_pos += cf.can_dlc;
+#else
+        exit(1);
+#endif
     } else {
         int ret = read(sq->serial_fd, &sq->input_buf[sq->input_pos]
                        , sizeof(sq->input_buf) - sq->input_pos);
@@ -366,6 +372,7 @@ do_write(struct serialqueue *sq, void *buf, int buflen)
             report_errno("write", ret);
         return;
     }
+#ifndef __APPLE__
     // Write to CAN fd
     struct can_frame cf;
     while (buflen) {
@@ -389,6 +396,9 @@ do_write(struct serialqueue *sq, void *buf, int buflen)
         buf += size;
         buflen -= size;
     }
+#else
+    exit(1);
+#endif
 }
 
 // Callback timer for when a retransmit should be done
@@ -783,9 +793,10 @@ serialqueue_send_batch(struct serialqueue *sq, struct command_queue *cq
     int len = 0;
     struct queue_message *qm;
     list_for_each_entry(qm, msgs, node) {
-        if (qm->min_clock + (1LL<<31) < qm->req_clock
+        if (qm->min_clock + (3LL<<29) < qm->req_clock
             && qm->req_clock != BACKGROUND_PRIORITY_CLOCK)
-            qm->min_clock = qm->req_clock - (1LL<<31);
+            // Avoid mcu clock comparison 31-bit overflow issues
+            qm->min_clock = qm->req_clock - (3LL<<29);
         len += qm->len;
     }
     if (! len)

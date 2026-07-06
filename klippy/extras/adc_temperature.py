@@ -3,7 +3,8 @@
 # Copyright (C) 2016-2018  Kevin O'Connor <kevin@koconnor.net>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import logging, bisect
+import bisect
+import logging
 
 from .danger_options import get_danger_options
 
@@ -161,6 +162,9 @@ class CustomLinearVoltage:
 class LinearResistance:
     def __init__(self, config, samples):
         self.pullup = config.getfloat("pullup_resistor", 4700.0, above=0.0)
+        self.inline_resistor = config.getfloat(
+            "inline_resistor", 0.0, minval=0.0
+        )
         try:
             self.li = LinearInterpolate([(r, t) for t, r in samples])
         except ValueError as e:
@@ -171,12 +175,12 @@ class LinearResistance:
     def calc_temp(self, adc):
         # Calculate temperature from adc
         adc = max(0.00001, min(0.99999, adc))
-        r = self.pullup * adc / (1.0 - adc)
+        r = self.pullup * adc / (1.0 - adc) - self.inline_resistor
         return self.li.interpolate(r)
 
     def calc_adc(self, temp):
         # Calculate adc reading from a temperature
-        r = self.li.reverse_interpolate(temp)
+        r = self.li.reverse_interpolate(temp) + self.inline_resistor
         return r / (self.pullup + r)
 
 

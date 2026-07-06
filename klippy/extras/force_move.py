@@ -3,7 +3,9 @@
 # Copyright (C) 2018-2019  Kevin O'Connor <kevin@koconnor.net>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import math, logging
+import logging
+import math
+
 from klippy import chelper
 
 BUZZ_DISTANCE = 1.0
@@ -174,12 +176,20 @@ class ForceMove:
         x = gcmd.get_float("X", curpos[0])
         y = gcmd.get_float("Y", curpos[1])
         z = gcmd.get_float("Z", curpos[2])
+        clear = gcmd.get("CLEAR", "").upper()
+        axes = ["X", "Y", "Z"]
+        clear_axes = [axes.index(a) for a in axes if a in clear]
         extra_axes = toolhead.get_extra_axes()
         for i in toolhead.rotary_axes:
             axis = extra_axes[i].get_axis_gcode_id()
             curpos[i] = gcmd.get_float(axis, curpos[i])
-        logging.info("SET_KINEMATIC_POSITION pos=%s", curpos)
+        logging.info(
+            "SET_KINEMATIC_POSITION pos=%s clear=%s",
+            curpos,
+            ",".join((axes[i] for i in clear_axes)),
+        )
         toolhead.set_position([x, y, z] + curpos[3:], homing_axes=(0, 1, 2))
+        toolhead.get_kinematics().clear_homing_state(clear_axes)
 
 
 def load_config(config):

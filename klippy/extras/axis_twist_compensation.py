@@ -5,8 +5,8 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
 import math
-from . import manual_probe, bed_mesh
 
+from . import bed_mesh, manual_probe
 
 DEFAULT_SAMPLE_COUNT = 3
 DEFAULT_SPEED = 50.0
@@ -51,6 +51,26 @@ class AxisTwistCompensation:
         self.zy_compensations = config.getlists(
             "zy_compensations", default=[], parser=float
         )
+
+        # validate that compensation values have required start/end points
+        if self.z_compensations:
+            if (
+                self.compensation_start_x is None
+                or self.compensation_end_x is None
+            ):
+                raise config.error(
+                    "z_compensations requires compensation_start_x and "
+                    "compensation_end_x to be set"
+                )
+        if self.zy_compensations:
+            if (
+                self.compensation_start_y is None
+                or self.compensation_end_y is None
+            ):
+                raise config.error(
+                    "zy_compensations requires compensation_start_y and "
+                    "compensation_end_y to be set"
+                )
 
         # setup calibrater
         self.calibrater = Calibrater(self, config)
@@ -152,8 +172,7 @@ class Calibrater:
     def _handle_connect(self):
         self.probe = self.printer.lookup_object("probe", None)
         if self.probe is None:
-            config = self.printer.lookup_object("configfile")
-            raise config.error(
+            raise self.printer.config_error(
                 "AXIS_TWIST_COMPENSATION requires [probe] to be defined"
             )
         self.lift_speed = self.probe.get_lift_speed()
@@ -190,12 +209,10 @@ class Calibrater:
         if axis == "X":
             self.compensation.clear_compensations("X")
 
-            if not all(
-                [
-                    self.x_start_point[0],
-                    self.x_end_point[0],
-                    self.x_start_point[1],
-                ]
+            if (
+                self.x_start_point[0] is None
+                or self.x_end_point[0] is None
+                or self.x_start_point[1] is None
             ):
                 raise gcmd.error(
                     """AXIS_TWIST_COMPENSATION for X axis requires
@@ -218,12 +235,10 @@ class Calibrater:
         elif axis == "Y":
             self.compensation.clear_compensations("Y")
 
-            if not all(
-                [
-                    self.y_start_point[0],
-                    self.y_end_point[0],
-                    self.y_start_point[1],
-                ]
+            if (
+                self.y_start_point[0] is None
+                or self.y_end_point[0] is None
+                or self.y_start_point[1] is None
             ):
                 raise gcmd.error(
                     """AXIS_TWIST_COMPENSATION for Y axis requires
@@ -258,49 +273,6 @@ class Calibrater:
         self.results = []
         self.current_axis = axis
         self._calibration(gcmd, probe_points, nozzle_points, interval_dist)
-
-    def _calculate_corrections(self, coordinates):
-        # Extracting x, y, and z values from coordinates
-        x_coords = [coord[0] for coord in coordinates]
-        y_coords = [coord[1] for coord in coordinates]
-        z_coords = [coord[2] for coord in coordinates]
-
-        # Calculate the desired point (average of all corner points in z)
-        # For a general case, we should extract the unique
-        # combinations of corner points
-        z_corners = [
-            z_coords[i]
-            for i, coord in enumerate(coordinates)
-            if (coord[0] in [x_coords[0], x_coords[-1]])
-            and (coord[1] in [y_coords[0], y_coords[-1]])
-        ]
-        z_desired = sum(z_corners) / len(z_corners)
-
-        # Calculate average deformation per axis
-        unique_x_coords = sorted(set(x_coords))
-        unique_y_coords = sorted(set(y_coords))
-
-        avg_z_x = []
-        for x in unique_x_coords:
-            indices = [
-                i for i, coord in enumerate(coordinates) if coord[0] == x
-            ]
-            avg_z = sum(z_coords[i] for i in indices) / len(indices)
-            avg_z_x.append(avg_z)
-
-        avg_z_y = []
-        for y in unique_y_coords:
-            indices = [
-                i for i, coord in enumerate(coordinates) if coord[1] == y
-            ]
-            avg_z = sum(z_coords[i] for i in indices) / len(indices)
-            avg_z_y.append(avg_z)
-
-        # Calculate corrections to reach the desired point
-        x_corrections = [z_desired - avg for avg in avg_z_x]
-        y_corrections = [z_desired - avg for avg in avg_z_y]
-
-        return x_corrections, y_corrections
 
     def _calculate_probe_points(
         self, nozzle_points, probe_x_offset, probe_y_offset

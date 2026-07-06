@@ -3,7 +3,12 @@
 # Copyright (C) 2016-2024  Kevin O'Connor <kevin@koconnor.net>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import os, re, logging, collections, shlex
+import collections
+import logging
+import os
+import re
+import shlex
+
 from . import mathutil
 
 
@@ -157,6 +162,7 @@ class GCodeDispatch:
         self.gcode_help = {}
         self.status_commands = {}
         self._interrupt_counter = 0
+        self._script_context = 0
         # Register commands needed before config file is loaded
         handlers = [
             "M110",
@@ -305,6 +311,8 @@ class GCodeDispatch:
             }
             gcmd = GCodeCommand(self, cmd, origline, params, need_ack)
             # Invoke handler for command
+            if self._script_context > 0 and cmd == "RETURN":
+                return
             handler = self.gcode_handlers.get(cmd, self.cmd_default)
             try:
                 handler(gcmd)
@@ -323,7 +331,11 @@ class GCodeDispatch:
             gcmd.ack()
 
     def run_script_from_command(self, script):
-        self._process_commands(script.split("\n"), need_ack=False)
+        self._script_context += 1
+        try:
+            self._process_commands(script.split("\n"), need_ack=False)
+        finally:
+            self._script_context -= 1
 
     def run_script(self, script):
         if "INTERRUPT" in script:
@@ -417,6 +429,7 @@ class GCodeDispatch:
             # Don't warn about requests to turn off fan when fan not present
             return
         gcmd.respond_info('Unknown command:"%s"' % (cmd,))
+        self.printer.send_event("gcode:unknown_command", cmd)
 
     def _cmd_mux(self, command, gcmd):
         key, values = self.mux_commands[command]

@@ -1,5 +1,5 @@
-import math
 import logging
+import math
 
 AMBIENT_TEMP = 25.0
 PIN_MIN_TIME = 0.100
@@ -362,6 +362,8 @@ class ControlMPC:
             "loss_ambient": self.last_loss_ambient,
             "loss_filament": self.last_loss_filament,
             "filament_temp": self.filament_temp_src,
+            "filament_heat_capacity": self.const_filament_heat_capacity,
+            "filament_density": self.const_filament_density,
         }
 
 
@@ -380,7 +382,10 @@ class MpcCalibrate:
             "AMBIENT_MEASURE_SAMPLE_TIME", 5.0, below=ambient_max_measure_time
         )
         fan_breakpoints = gcmd.get_int("FAN_BREAKPOINTS", 3, minval=2)
-        target_temp = gcmd.get_float("TARGET", 200.0, minval=90.0)
+        default_target_temp = (
+            90.0 if self.heater.get_name() == "heater_bed" else 200.0
+        )
+        target_temp = gcmd.get_float("TARGET", default_target_temp, minval=60.0)
         threshold_temp = gcmd.get_float(
             "THRESHOLD", max(50.0, min(100, target_temp - 100.0))
         )
@@ -610,8 +615,7 @@ class MpcCalibrate:
             for idx in range(0, fan_breakpoints):
                 speed = idx / (fan_breakpoints - 1)
                 curtime = self.heater.reactor.monotonic()
-                print_time = fan.get_mcu().estimated_print_time(curtime)
-                fan.set_speed(print_time + PIN_MIN_TIME, speed)
+                fan.set_speed(speed)
                 gcmd.respond_info("Waiting for temperature to stabilize")
                 self.wait_stable(3)
                 gcmd.respond_info(
@@ -625,8 +629,7 @@ class MpcCalibrate:
                 )
                 fan_powers.append((speed, power))
             curtime = self.heater.reactor.monotonic()
-            print_time = fan.get_mcu().estimated_print_time(curtime)
-            fan.set_speed(print_time + PIN_MIN_TIME, 0.0)
+            fan.set_speed(0.0)
             power_base = fan_powers[0][1]
 
         return {

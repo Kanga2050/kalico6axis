@@ -4,8 +4,11 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 import logging
+
 import numpy as np
+
 from klippy import mathutil
+
 from . import probe
 
 
@@ -163,7 +166,7 @@ class RetryHelper:
 
     def check_retry(self, z_positions):
         if self.max_retries == 0:
-            return
+            return "done"
         error = round(max(z_positions) - min(z_positions), 6)
         self.gcode.respond_info(
             "Retries: %d/%d %s: %0.6f tolerance: %0.6f"
@@ -224,6 +227,8 @@ class ZTilt:
         self.ad_conf_delta = config.getfloat(
             "autodetect_delta", 1.0, minval=0.1
         )
+
+        self.use_adjustments = config.getboolean("use_adjustments", False)
 
         # Register Z_TILT_ADJUST command
         gcode = self.printer.lookup_object("gcode")
@@ -305,6 +310,7 @@ class ZTilt:
             x * x_adjust + y * y_adjust + z_adjust for x, y in self.z_positions
         ]
         self.z_helper.adjust_steppers(adjustments, speed)
+        return adjustments
 
     def probe_finalize(self, offsets, positions):
         if self.z_offsets is not None:
@@ -313,9 +319,13 @@ class ZTilt:
                 for (p, o) in zip(positions, self.z_offsets)
             ]
         new_params = self.perform_coordinate_descent(offsets, positions)
-        self.apply_adjustments(offsets, new_params)
+        adjustments = self.apply_adjustments(offsets, new_params)
         return self.z_status.check_retry_result(
-            self.retry_helper.check_retry([p[2] for p in positions])
+            self.retry_helper.check_retry(
+                adjustments
+                if self.use_adjustments
+                else [p[2] for p in positions]
+            )
         )
 
     def cmd_Z_TILT_CALIBRATE(self, gcmd):

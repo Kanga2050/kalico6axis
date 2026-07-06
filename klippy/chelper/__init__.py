@@ -3,9 +3,10 @@
 # Copyright (C) 2016-2021  Kevin O'Connor <kevin@koconnor.net>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import os, logging
-import cffi
+import logging
+import os
 
+import cffi
 
 ######################################################################
 # c_helper.so compiling
@@ -15,9 +16,9 @@ GCC_CMD = "gcc"
 COMPILE_ARGS = (
     "-Wall -g -O3 -shared -fPIC"
     " -flto -fwhole-program -fno-use-linker-plugin"
-    " -march=native -mcpu=native -mtune=native"
     " -o %s %s"
 )
+NATIVE_FLAGS = "-march=native -mtune=native"
 SSE_FLAGS = "-mfpmath=sse -msse2"
 NEON_FLAGS = "-mfpu=neon"
 SOURCE_FILES = [
@@ -360,7 +361,9 @@ def get_ffi():
         ofiles = get_abs_files(srcdir, OTHER_FILES)
         destlib = get_abs_files(srcdir, [DEST_LIB])[0]
         if check_build_code(srcfiles + ofiles + [__file__], destlib):
-            if check_gcc_option(SSE_FLAGS):
+            if check_gcc_option(NATIVE_FLAGS):
+                cmd = "%s %s %s" % (GCC_CMD, NATIVE_FLAGS, COMPILE_ARGS)
+            elif check_gcc_option(SSE_FLAGS):
                 cmd = "%s %s %s" % (GCC_CMD, SSE_FLAGS, COMPILE_ARGS)
             elif check_gcc_option(NEON_FLAGS):
                 cmd = "%s %s %s" % (GCC_CMD, NEON_FLAGS, COMPILE_ARGS)
