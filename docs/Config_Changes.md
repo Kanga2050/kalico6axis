@@ -8,6 +8,11 @@ All dates in this document are approximate.
 
 ## Changes
 
+20260914: The firmware "USB product" string now follows the selected
+MCU unless "USB product from MCU name" is disabled in the low-level
+"USB ids" menu of `make menuconfig`. A custom USB product set in an
+existing `.config` may need to be re-entered after disabling that option.
+
 20260121: Kalico now uses automatic monthly release tags in the format
 `vYYYY.MM.NN` (e.g., `v2026.01.00`). Users can configure Moonraker to track
 stable monthly releases instead of the latest commits. See
