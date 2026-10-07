@@ -1,0 +1,11 @@
+name: Setup pnpm and Node
+description: Installs pnpm and the project's Node.js runtime from package.json, with the pnpm store cached.
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm and Node
+      uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+      with:
+        install: false
+        cache: true

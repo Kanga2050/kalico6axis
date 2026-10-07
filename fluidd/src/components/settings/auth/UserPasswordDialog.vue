@@ -1,0 +1,85 @@
+<template>
+  <app-dialog
+    v-model="open"
+    :title="$t('app.general.label.change_password')"
+    :cancel-button-loading="loading"
+    :save-button-loading="loading"
+    max-width="500"
+    @save="handleSave"
+  >
+    <v-card-text class="pa-0">
+      <app-setting :title="$t('app.general.label.current_password')">
+        <v-text-field
+          v-model="currentPassword"
+          autocomplete="current-password"
+          filled
+          dense
+          type="password"
+          class="mt-0"
+          hide-details="auto"
+          :rules="[
+            $rules.required
+          ]"
+        />
+      </app-setting>
+
+      <v-divider />
+
+      <app-setting :title="$t('app.general.label.new_password')">
+        <v-text-field
+          v-model="password"
+          autocomplete="current-password"
+          filled
+          dense
+          type="password"
+          class="mt-0"
+          hide-details="auto"
+          :rules="[
+            $rules.required,
+            $rules.lengthGreaterThanOrEqual(4),
+            $rules.passwordNotEqualUsername(currentUser)
+          ]"
+        />
+      </app-setting>
+    </v-card-text>
+  </app-dialog>
+</template>
+
+<script lang="ts">
+import { Component, Vue, VModel } from 'vue-property-decorator'
+import { EventBus } from '@/eventBus'
+import type { AppUser } from '@/store/auth/types'
+import { SocketActions } from '@/api/socketActions'
+
+@Component({})
+export default class UserPasswordDialog extends Vue {
+  @VModel({ type: Boolean })
+  open?: boolean
+
+  currentPassword = ''
+  password = ''
+  loading = false
+
+  get currentUser () {
+    const currentUser: AppUser | null = this.$typedState.auth.currentUser
+
+    return currentUser?.username ?? ''
+  }
+
+  async handleSave () {
+    try {
+      this.loading = true
+
+      await SocketActions.accessUserPassword(this.currentPassword, this.password)
+
+      EventBus.$emit(this.$tc('app.general.msg.password_changed'), { timeout: 2000 })
+
+      this.open = false
+    } catch {
+      // Swallow the rejection — the error already toasts via socket/onSocketError.
+    } finally {
+      this.loading = false
+    }
+  }
+}
+</script>

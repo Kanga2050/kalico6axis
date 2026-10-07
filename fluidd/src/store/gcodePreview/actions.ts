@@ -1,0 +1,120 @@
+import type { ActionTree } from 'vuex'
+import type { GcodePreviewState } from './types'
+import { defaultMoveStore } from './state'
+import type { RootState } from '../types'
+import type { AppFile, AppFileWithMeta } from '@/store/files/types'
+import { EventBus } from '@/eventBus'
+import i18n from '@/plugins/i18n'
+import { consola } from 'consola'
+
+import type { ParseGcodeWorkerResponseMessage, ParseGcodeWorkerRequestMessage } from '@/workers/parseGcode.worker'
+
+import ParseGcodeWorker from '@/workers/parseGcode.worker.ts?worker'
+
+export const actions = {
+  /**
+   * Reset our store
+   */
+  async reset ({ commit }) {
+    commit('setReset')
+  },
+
+  async terminateParserWorker ({ commit, state }) {
+    const worker = state.parserWorker
+
+    if (worker) {
+      commit('setParserWorker', null)
+
+      worker.terminate()
+
+      commit('setFile', null)
+    }
+  },
+
+  async loadGcode ({ commit, state, rootState, dispatch }, payload: { file: AppFile | AppFileWithMeta; url: string }) {
+    if (state.parserWorker) {
+      await dispatch('terminateParserWorker')
+    }
+
+    const worker = new ParseGcodeWorker()
+
+    commit('setParserWorker', worker)
+
+    worker.onmessage = (event: MessageEvent<ParseGcodeWorkerResponseMessage>) => {
+      if (state.parserWorker !== worker) {
+        return
+      }
+
+      const message = event.data
+
+      switch (message.action) {
+        case 'progress': {
+          commit('setParserProgress', message.filePosition)
+          break
+        }
+
+        case 'result': {
+          try {
+            commit('setMoves', message.moves)
+            commit('setLayers', message.layers)
+            commit('setParts', message.parts)
+            commit('setTools', message.tools)
+            commit('setBounds', message.bounds)
+            commit('setParserProgress', payload.file.size)
+
+            if (message.truncated) {
+              EventBus.$emit(i18n.t('app.general.msg.gcode_preview_truncated').toString(), { type: 'warning' })
+            }
+
+            if (rootState.config.uiSettings.gcodePreview.hideSinglePartBoundingBox && message.parts.length <= 1) {
+              dispatch('config/saveByPath', {
+                path: 'uiSettings.gcodePreview.showParts',
+                value: false,
+                server: true
+              }, { root: true })
+            }
+          } catch (e) {
+            consola.error('Error parsing g-code file', e)
+
+            EventBus.$emit(i18n.t('app.general.msg.gcode_preview_failed').toString(), { type: 'error' })
+          }
+
+          commit('setParserWorker', null)
+
+          worker.terminate()
+
+          if (state.moves.length === 0) {
+            commit('setFile', null)
+          }
+
+          break
+        }
+
+        case 'error': {
+          dispatch('terminateParserWorker')
+
+          EventBus.$emit(i18n.t('app.general.msg.gcode_preview_failed').toString(), { type: 'error' })
+
+          break
+        }
+      }
+    }
+
+    commit('setParserProgress', 0)
+    commit('setMoves', defaultMoveStore)
+    commit('setLayers', [])
+    commit('setParts', [])
+    commit('setTools', [])
+    commit('setBounds', null)
+
+    commit('setFile', payload.file)
+
+    const message: ParseGcodeWorkerRequestMessage = {
+      action: 'parse',
+      url: payload.url,
+      fileSize: payload.file.size
+    }
+
+    worker.postMessage(message)
+  }
+} satisfies ActionTree<GcodePreviewState, RootState>
