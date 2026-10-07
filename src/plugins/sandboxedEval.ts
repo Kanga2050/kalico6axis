@@ -1,0 +1,94 @@
+import type { SandboxedEvalWorkerResponseMessage, SandboxedEvalWorkerRequestMessage } from '@/workers/sandboxedEval.worker'
+
+import SandboxedEvalWorker from '@/workers/sandboxedEval.worker?ts?worker'
+
+const workers: Record<string, Worker> = {}
+
+export interface SandboxedEvalOptions {
+  feature?: string;
+  timeout?: number;
+  context?: unknown;
+}
+
+const sandboxedEval = async (code: string, options: SandboxedEvalOptions = {}): Promise<unknown> => {
+  const { feature, timeout = 800, context } = options
+
+  const id = Date.now()
+  const worker = getWorker(feature)
+
+  const signal = AbortSignal.timeout(timeout)
+
+  const workerPromise = new Promise<unknown>((resolve, reject) => {
+    const cleanup = () => {
+      worker.removeEventListener('message', messageHandler)
+      signal.removeEventListener('abort', abortHandler)
+    }
+
+    const abortHandler = () => {
+      cleanup()
+      reject(signal.reason ?? new Error('Timeout'))
+    }
+
+    const messageHandler = (event: MessageEvent<SandboxedEvalWorkerResponseMessage>) => {
+      const message = event.data
+
+      if (message.id !== id) {
+        return
+      }
+
+      cleanup()
+
+      switch (message.action) {
+        case 'result': {
+          resolve(message.result)
+
+          break
+        }
+        case 'error': {
+          reject(message.error)
+
+          break
+        }
+      }
+    }
+
+    worker.addEventListener('message', messageHandler)
+
+    signal.addEventListener('abort', abortHandler, { once: true })
+  })
+
+  const message: SandboxedEvalWorkerRequestMessage = {
+    code,
+    context,
+    id
+  }
+
+  worker.postMessage(message)
+
+  try {
+    return await workerPromise
+  } finally {
+    if (feature && signal.aborted) {
+      worker.terminate()
+      delete workers[feature]
+    } else if (!feature) {
+      worker.terminate()
+    }
+  }
+}
+
+const getWorker = (feature?: string) => {
+  if (feature) {
+    if (workers[feature]) {
+      return workers[feature]
+    }
+
+    const worker = workers[feature] = new SandboxedEvalWorker()
+
+    return worker
+  }
+
+  return new SandboxedEvalWorker()
+}
+
+export default sandboxedEval

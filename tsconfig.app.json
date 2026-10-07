@@ -1,0 +1,40 @@
+{
+  "extends": "@vue/tsconfig/tsconfig.dom.json",
+
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      // vuex's exports field resolves to dist/vuex.mjs under Bundler mode,
+      // which has no adjacent types. Point TypeScript to the actual type declarations.
+      "vuex": [
+        "./node_modules/vuex/types/index.d.ts"
+      ],
+      // Under Bundler mode the "./*": "./*" exports wildcard doesn't resolve
+      // subpath type declarations. Point TypeScript directly to the package files.
+      "monaco-editor/esm/*": [
+        "./node_modules/monaco-editor/esm/*"
+      ]
+    },
+
+    "experimentalDecorators": true
+  },
+
+  "vueCompilerOptions": {
+    "target": 2.7
+  },
+
+  "include": [
+    "*.d.ts",
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "src/monaco/theme/editor.*.theme.json"
+  ],
+
+  "exclude": [
+    "src/**/__tests__/*"
+  ]
+}

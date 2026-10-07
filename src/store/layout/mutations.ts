@@ -1,0 +1,90 @@
+import Vue from 'vue'
+import type { MutationTree } from 'vuex'
+import { createState } from './state'
+import type { LayoutConfig, LayoutState, LayoutContainer } from './types'
+import type { DiagnosticsCardContainer } from '../diagnostics/types'
+
+export const mutations = {
+  /**
+   * Reset state
+   */
+  setReset (state) {
+    Object.assign(state, createState())
+  },
+
+  /**
+   * Inits the layout from moonraker.
+   * This merge strategy should account for supported components
+   * being the default state, and newly added components users may not
+   * have in their moonraker db.
+   */
+  setInitLayout (state, payload: LayoutState) {
+    if (payload && Object.keys(payload).length > 0) {
+      const defaultLayouts = createState().layouts
+
+      // add new layouts
+      for (const [layoutKey, defaultLayout] of Object.entries(defaultLayouts)) {
+        if (!payload.layouts[layoutKey]) {
+          payload.layouts[layoutKey] = defaultLayout
+        }
+      }
+
+      // migrate existing layouts
+      const migratableLayoutKeys = ['dashboard']
+
+      for (const [layoutKey, currentLayout] of Object.entries(payload.layouts)) {
+        for (const [containerKey, components] of Object.entries(currentLayout)) {
+          currentLayout[containerKey] = Array.isArray(components)
+            ? components
+              .filter(card => card != null)
+            : []
+        }
+
+        const migratableLayoutKey = migratableLayoutKeys.find(key => layoutKey.startsWith(key))
+
+        if (migratableLayoutKey) {
+          const defaultLayout = defaultLayouts[migratableLayoutKey]
+          const defaultComponentIds = Object.values(defaultLayout).flat().map(card => card.id)
+          const currentComponentIds = Object.values(currentLayout).flat().map(card => card.id)
+
+          for (const [containerKey, defaultContainerComponents] of Object.entries(defaultLayout)) {
+            const currentContainerComponents = currentLayout[containerKey] || []
+
+            currentLayout[containerKey] = [
+              ...currentContainerComponents.filter(component => defaultComponentIds.includes(component.id)),
+              ...defaultContainerComponents.filter(component => !currentComponentIds.includes(component.id))
+            ]
+          }
+        }
+
+        // diagnostics specific layout updates
+        if (layoutKey.startsWith('diagnostics')) {
+          const diagnostics = currentLayout as DiagnosticsCardContainer
+
+          for (const diagnosticsCardConfigs of Object.values(diagnostics)) {
+            for (const diagnosticsCardConfig of diagnosticsCardConfigs) {
+              for (const axis of diagnosticsCardConfig.axes) {
+                for (const metric of axis.metrics) {
+                  metric.style.fillColor = metric.style.fillColor ?? null
+                }
+              }
+            }
+          }
+        }
+      }
+
+      Object.assign(state, payload)
+    }
+  },
+
+  setLayoutChange (state, payload: { name: string; value: LayoutContainer }) {
+    Vue.set(state.layouts, payload.name, payload.value)
+  },
+
+  /**
+   * Updates a layout config item.
+   */
+  setUpdateConfig (state, payload: { name: string; container: string; i: number; value: LayoutConfig }) {
+    Vue.set(state.layouts[payload.name][payload.container], payload.i, payload.value)
+  }
+} satisfies MutationTree<LayoutState>

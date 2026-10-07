@@ -1,0 +1,92 @@
+import type { ActionTree } from 'vuex'
+import type { WebcamsState, LegacyCamerasState, LegacyCameraType, DatabaseWebcamConfig } from './types'
+import type { RootState } from '../types'
+import { SocketActions } from '@/api/socketActions'
+import setUrlQueryParam from '@/util/set-url-query-param'
+import { Globals } from '@/globals'
+
+const legacyCameraTypeToWebcamService: Record<LegacyCameraType, Moonraker.Webcam.Service> = {
+  mjpgstream: 'mjpegstreamer',
+  mjpgadaptive: 'mjpegstreamer-adaptive',
+  iframe: 'iframe',
+  ipstream: 'ipstream'
+}
+
+const mjpegstreamerServices: Moonraker.Webcam.Service[] = [
+  'mjpegstreamer',
+  'mjpegstreamer-adaptive'
+]
+
+export const actions = {
+  async reset ({ commit }) {
+    commit('setReset')
+  },
+
+  async init () {
+    SocketActions.serverWebcamsList()
+  },
+
+  async initWebcams ({ commit }, payload: { activeWebcam?: string }) {
+    commit('setInitWebcams', payload)
+  },
+
+  async initLegacyCameras (_, payload: LegacyCamerasState) {
+    if (payload.cameras) {
+      for (const legacyCamera of payload.cameras) {
+        const service = legacyCameraTypeToWebcamService[legacyCamera.type]
+        const isMjpegStreamer = mjpegstreamerServices.includes(service)
+
+        const webcam: DatabaseWebcamConfig = {
+          name: legacyCamera.name,
+          location: 'printer',
+          service,
+          icon: 'mdiWebcam',
+          enabled: legacyCamera.enabled ?? true,
+          targetFps: legacyCamera.fpstarget || 15,
+          targetFpsIdle: legacyCamera.fpsidletarget || 5,
+          urlStream: isMjpegStreamer && legacyCamera.url ? setUrlQueryParam(legacyCamera.url, 'action', 'stream') : legacyCamera.url,
+          urlSnapshot: isMjpegStreamer && legacyCamera.url ? setUrlQueryParam(legacyCamera.url, 'action', 'snapshot') : legacyCamera.url,
+          flipX: legacyCamera.flipX ?? false,
+          flipY: legacyCamera.flipY ?? false,
+          rotation: legacyCamera.rotate ? +legacyCamera.rotate as Moonraker.Webcam.Rotation : 0,
+          aspectRatio: '4:3',
+          extraData: {}
+        }
+
+        await SocketActions.serverDatabasePostItem(legacyCamera.id, webcam, Globals.MOONRAKER_DB.webcams.NAMESPACE)
+      }
+
+      await SocketActions.serverDatabaseDeleteItem(Globals.MOONRAKER_DB.fluidd.ROOTS.cameras.name, Globals.MOONRAKER_DB.fluidd.NAMESPACE)
+    }
+  },
+
+  async updateWebcam ({ commit }, payload: Moonraker.Webcam.Entry) {
+    commit('setUpdateWebcam', payload)
+
+    SocketActions.serverWebcamsWrite(payload)
+  },
+
+  async removeWebcam ({ commit }, payload: string) {
+    commit('setRemoveWebcam', payload)
+
+    SocketActions.serverWebcamsDelete(payload)
+  },
+
+  async updateActiveWebcam ({ commit, state }, payload: string) {
+    commit('setActiveWebcam', payload)
+
+    SocketActions.serverDatabasePostItem(Globals.MOONRAKER_DB.fluidd.ROOTS.webcams.name + '.activeWebcam', state.activeWebcam)
+  },
+
+  async onWebcamsList ({ commit }, payload: Moonraker.Webcam.ListResponse) {
+    if (payload) {
+      commit('setWebcamsList', payload)
+    }
+  },
+
+  async onWebcamsChanged ({ commit }, payload: Moonraker.Webcam.ListResponse) {
+    if (payload) {
+      commit('setWebcamsList', payload)
+    }
+  }
+} satisfies ActionTree<WebcamsState, RootState>
