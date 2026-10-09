@@ -6,6 +6,7 @@
   :root { --bg: #14171c; --panel: #1c2027; --ink: #e6e9ee; --muted: #9aa3b0; --line: #2c323c; }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; background: var(--bg); }
 header { display: flex; align-items: center; gap: 16px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .brand { font-weight: 700; }

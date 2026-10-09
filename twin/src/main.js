@@ -124,11 +124,17 @@ function frame(now) {
 }
 
 async function init() {
-  ;[machine, manifest] = await Promise.all([
-    fetch('./machine.json').then(r => r.json()),
-    fetch('./model/manifest.json').then(r => r.json())
-  ])
+  machine = await fetch('./machine.json').then(r => r.json())
+  let hasModel = true
+  manifest = await fetch('./model/manifest.json').then(r => { if (!r.ok) throw new Error(); return r.json() }).catch(() => {
+    hasModel = false
+    return {
+      groups: {}, bed_top_center: [177, 217, 127], nozzle_tip_cad: [177, 181.1, 175],
+      tilt_axis: { point: [177, 217, 132], dir: [1, 0, 0] }, rotary_axis: { point: [177, 217, 127], dir: [0, 0, 1] }
+    }
+  })
   scene = new TwinScene($('c'), manifest, machine)
+  if (!hasModel) { scene.buildPlaceholder(); log('CAD model not found, showing a simple stand-in') }
   sim.manual = [machine.rotary_c.pivot[0], machine.rotary_c.pivot[1], 40, 0, 0, 0]
   $('legend').innerHTML = FEATURES.slice(0, 14).map((f, i) => `<span style="--c:#${FEATURE_COLORS[i].toString(16).padStart(6, '0')}">${f}</span>`).join('')
   await scene.load('./model/', (f, g) => { $('loading').textContent = `Loading printer model… ${Math.round(f * 100)}%` })
@@ -156,16 +162,22 @@ async function init() {
   }
   if ($('host').value) $('connect').click()
 
+  const simLoad = async (text, name) => {
+    try {
+      const res = await plan(text, name)
+      sim.load(res, name)
+      setMode('sim')
+      $('warnings').innerHTML = res.warnings.map(w => `<li>${w}</li>`).join('')
+      log(`${name}: ${res.segs.length / 20} moves, ${res.ext.length / 6} extrusions, ${hms(res.duration)}`)
+    } catch (err) { log(String(err)) }
+  }
   $('file').onchange = async (e) => {
     const f = e.target.files[0]; if (!f) return
-    const text = await f.text()
-    try {
-      const res = await plan(text, f.name)
-      sim.load(res, f.name)
-      scene.setToolpath(res)
-      $('warnings').innerHTML = res.warnings.map(w => `<li>${w}</li>`).join('')
-      log(`${f.name}: ${res.segs.length / 20} moves, ${res.ext.length / 6} extrusions, ${hms(res.duration)}`)
-    } catch (err) { log(String(err)) }
+    simLoad(await f.text(), f.name)
+  }
+  if (params.get('gcode')) {
+    const url = params.get('gcode')
+    fetch(url).then(r => r.text()).then(t => simLoad(t, url.split('/').pop())).catch(e => log(e.message))
   }
   $('play').onclick = () => { if (sim.res) { if (sim.t >= sim.duration) sim.t = 0; sim.playing = !sim.playing } }
   $('end').onclick = () => { if (sim.res) { sim.t = sim.duration; sim.playing = false } }
