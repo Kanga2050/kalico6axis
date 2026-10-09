@@ -64,6 +64,22 @@
                             @submit="sendCmd" />
                     </v-col>
                 </v-row>
+                <v-row v-if="showCoordinates && rotaryAxes.length" dense>
+                    <v-col v-for="axis in rotaryAxes" :key="axis" :class="el.is.xsmall ? 'col-12' : 'col-4'">
+                        <move-to-input
+                            v-model="rotaryInput[axis]"
+                            :label="liveRotary(axis)"
+                            :suffix="axis"
+                            :step="0.01"
+                            :current-pos="rotaryPosition(axis)"
+                            :readonly="['printing'].includes(printer_state)"
+                            :disabled="!xAxisHomed || !yAxisHomed || !zAxisHomed"
+                            @submit="sendRotary(axis)" />
+                    </v-col>
+                    <v-col :class="el.is.xsmall ? 'col-12' : 'col-4'">
+                        <v-btn block outlined :href="twinUrl" target="_blank">Twin</v-btn>
+                    </v-col>
+                </v-row>
             </template>
         </responsive>
     </v-container>
@@ -145,6 +161,52 @@ export default class MoveToControl extends Mixins(BaseMixin, ControlMixin) {
             y: pos[1]?.toFixed(2) ?? '--',
             z: pos[2]?.toFixed(3) ?? '--',
         }
+    }
+
+    rotaryInput: Record<string, string> = {}
+
+    get rotaryAxes(): string[] {
+        const extra = this.$store.state.printer.toolhead?.extra_axes ?? {}
+        return Object.keys(extra)
+            .filter((a) => ['A', 'B', 'C'].includes(a))
+            .sort()
+    }
+
+    rotaryPosition(axis: string): string {
+        const gm = this.$store.state.printer.gcode_move?.gcode_extra_axes ?? {}
+        const th = this.$store.state.printer.toolhead?.extra_axes ?? {}
+        return (gm[axis] ?? th[axis] ?? 0).toFixed(2)
+    }
+
+    liveRotary(axis: string): string {
+        const pose = this.$store.state.printer.motion_report?.live_pose
+        const index = ({ A: 3, B: 4, C: 5 } as Record<string, number>)[axis] ?? 3
+        return pose ? `${pose[index].toFixed(2)}°` : this.rotaryPosition(axis)
+    }
+
+    @Watch('rotaryAxes', { immediate: true })
+    syncRotaryInputs(): void {
+        for (const axis of this.rotaryAxes) {
+            if (!(axis in this.rotaryInput)) this.$set(this.rotaryInput, axis, this.rotaryPosition(axis))
+        }
+    }
+
+    get twinUrl(): string {
+        const host =
+            this.$store.getters['socket/getHostUrl'] ?? `${window.location.protocol}//${window.location.hostname}`
+        const u = new URL(host)
+        const api = `${u.protocol}//${u.hostname}:${this.$store.state.socket.port || 7125}`
+        return `${api}/twin/index.html?printer=${encodeURIComponent(u.hostname + ':' + (this.$store.state.socket.port || 7125))}`
+    }
+
+    sendRotary(axis: string): void {
+        const pos = this.rotaryInput[axis]
+        if (pos === this.rotaryPosition(axis)) return
+        const gcode = this.existsClientLinearMoveMacro
+            ? `_CLIENT_LINEAR_MOVE ${axis}=${pos} F=${this.feedrateXY * 60} ABSOLUTE=1`
+            : `SAVE_GCODE_STATE NAME=_ui_movement\nG90\nG1 ${axis}${pos} F${this.feedrateXY * 60}\nRESTORE_GCODE_STATE NAME=_ui_movement`
+        this.$store.dispatch('server/addEvent', { message: gcode, type: 'command' })
+        this.$socket.emit('printer.gcode.script', { script: gcode })
     }
 
     /**

@@ -118,6 +118,50 @@
         </app-btn-toggle>
       </v-col>
     </v-row>
+    <v-row
+      v-if="rotaryAxes.length"
+      no-gutters
+      class="mt-3"
+    >
+      <v-col
+        v-for="(axis, i) in rotaryAxes"
+        :key="axis"
+        cols="3"
+        :class="i ? 'pl-1 pr-1' : 'pr-1'"
+      >
+        <app-text-field
+          color="primary"
+          :label="`${axis} [ ${liveRotary(axis).toFixed(2)}° ]`"
+          :rules="[
+            $rules.required,
+            $rules.numberValid
+          ]"
+          outlined
+          persistent-placeholder
+          hide-details
+          dense
+          small
+          type="number"
+          :disabled="!klippyReady || !allHomed"
+          :readonly="printerPrinting"
+          :value="rotaryPosition(axis).toFixed(2)"
+          @submit="moveRotaryTo(axis, +$event)"
+        />
+      </v-col>
+      <v-col
+        cols="3"
+        class="pl-1"
+      >
+        <app-btn
+          block
+          small
+          :href="twinUrl"
+          target="_blank"
+        >
+          Twin
+        </app-btn>
+      </v-col>
+    </v-row>
   </div>
 </template>
 
@@ -146,6 +190,36 @@ export default class ToolheadPosition extends Mixins(StateMixin, ToolheadMixin) 
 
   get livePosition (): [number, number, number, ...number[]] {
     return this.$typedState.printer.printer.motion_report?.live_position ?? [0, 0, 0]
+  }
+
+  get rotaryAxes (): string[] {
+    const extra = this.$typedState.printer.printer.toolhead.extra_axes ?? {}
+    return Object.keys(extra).filter(a => ['A', 'B', 'C'].includes(a)).sort()
+  }
+
+  rotaryPosition (axis: string): number {
+    const gm = this.$typedState.printer.printer.gcode_move
+    const value = this.useGcodeCoords
+      ? gm.gcode_extra_axes?.[axis]
+      : this.$typedState.printer.printer.toolhead.extra_axes?.[axis]
+    return value ?? 0
+  }
+
+  liveRotary (axis: string): number {
+    const pose = this.$typedState.printer.printer.motion_report?.live_pose
+    const index = { A: 3, B: 4, C: 5 }[axis] ?? 3
+    return pose?.[index] ?? this.rotaryPosition(axis)
+  }
+
+  get twinUrl (): string {
+    const api = this.$typedState.config.apiUrl || `${window.location.protocol}//${window.location.hostname}:7125`
+    return `${api}/twin/index.html?printer=${encodeURIComponent(new URL(api).host)}`
+  }
+
+  moveRotaryTo (axis: string, pos: number) {
+    if (this.rotaryPosition(axis) === pos) return
+    const rate: number = this.$typedState.config.uiSettings.general.defaultToolheadXYSpeed
+    this.sendMoveGcode({ [axis]: pos }, rate, true)
   }
 
   get useGcodeCoords (): boolean {

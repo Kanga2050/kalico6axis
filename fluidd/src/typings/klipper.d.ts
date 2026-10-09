@@ -199,6 +199,8 @@ declare namespace Klipper {
     position: [number, number, number, ...number[]];
     gcode_position: [number, number, number, ...number[]];
     axis_map?: Record<string, number>;
+    extra_axes?: Record<string, number>;
+    gcode_extra_axes?: Record<string, number>;
   }
 
   export interface IdleTimeoutState {
@@ -412,6 +414,8 @@ declare namespace Klipper {
     live_position: [number, number, number, ...number[]];
     live_velocity: number;
     live_extruder_velocity: number;
+    live_pose?: number[];
+    live_machine_position?: [number, number, number];
     steppers?: (`extruder_stepper ${string}` | `stepper_${string}` | ExtruderKey)[];
     trapq?: string[];
   }
