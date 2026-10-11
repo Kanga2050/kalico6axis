@@ -1203,8 +1203,9 @@ export default class Viewer extends Mixins(BaseMixin) {
 
     attachToWorkpiece(node: AbstractMesh | TransformNode) {
         if (!workpieceNode || workpieceNode.isDisposed() || node === workpieceNode || node.isDisposed()) return
-        if (node.parent || FIXED_MESHES.test(node.name)) return
-        if (printerModel?.meshes().includes(node as AbstractMesh)) return
+        if (node.parent || FIXED_MESHES.test(node.name) || node.metadata?.printerModel) return
+        // a model file still loading: its meshes are not toolpath, and moveWorkpiece catches up later
+        if (PrinterModel.importing > 0) return
         node.parent = workpieceNode
         if (node.isWorldMatrixFrozen) node.freezeWorldMatrix()
     }
