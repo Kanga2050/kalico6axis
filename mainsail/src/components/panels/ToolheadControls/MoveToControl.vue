@@ -191,9 +191,8 @@ export default class MoveToControl extends Mixins(BaseMixin, ControlMixin) {
     sendRotary(axis: string): void {
         const pos = this.rotaryInput[axis]
         if (pos === this.rotaryPosition(axis)) return
-        const gcode = this.existsClientLinearMoveMacro
-            ? `_CLIENT_LINEAR_MOVE ${axis}=${pos} F=${this.feedrateXY * 60} ABSOLUTE=1`
-            : `SAVE_GCODE_STATE NAME=_ui_movement\nG90\nG1 ${axis}${pos} F${this.feedrateXY * 60}\nRESTORE_GCODE_STATE NAME=_ui_movement`
+        // plain G-code: the stock _CLIENT_LINEAR_MOVE macro only passes on X, Y, Z and E
+        const gcode = `SAVE_GCODE_STATE NAME=_ui_movement\nG90\nG1 ${axis}${pos} F${this.feedrateXY * 60}\nRESTORE_GCODE_STATE NAME=_ui_movement`
         this.$store.dispatch('server/addEvent', { message: gcode, type: 'command' })
         this.$socket.emit('printer.gcode.script', { script: gcode })
     }

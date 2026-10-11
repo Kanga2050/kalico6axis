@@ -22,7 +22,7 @@ SHORT_SOURCES = (
     "x", "y", "z", "e", "a", "b", "c",
     "machine_x", "machine_y", "machine_z",
 )
-SOURCE_RE = re.compile(r"^[a-z_][\w ]*:[a-z_]\w*(\.\d+)?$")
+SOURCE_RE = re.compile(r"^[a-z_][\w ]*:[a-z_]\w*(\.[\w ]+)*$")
 COLOR_RE = re.compile(r"^#?[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$")
 
 
@@ -73,6 +73,7 @@ class Model:
         self.up_axis = config.getchoice("up_axis", ["z", "y"], "z")
         self.unit_scale = config.getfloat("unit_scale", 1.0, above=0.0)
         self.offset = config.getfloatlist("offset", (0.0, 0.0, 0.0), count=3)
+        self.workpiece = config.get("workpiece", None)
         self.parts = {}
         self.printer.register_event_handler("klippy:connect", self._check)
 
@@ -102,6 +103,10 @@ class Model:
 
     def _check(self):
         self.order = self._ordered()
+        if self.workpiece is not None and self.workpiece not in self.parts:
+            raise self.error(
+                "[model] workpiece '%s' is not a model_part" % (self.workpiece,)
+            )
 
     def get_status(self, eventtime):
         order = getattr(self, "order", None) or self._ordered()
@@ -109,6 +114,7 @@ class Model:
             "up_axis": self.up_axis,
             "unit_scale": self.unit_scale,
             "offset": list(self.offset),
+            "workpiece": self.workpiece,
             "root": dict(self.root),
             "parts": [dict(p) for p in order],
         }
@@ -142,7 +148,7 @@ class ModelPart:
             elif not SOURCE_RE.match(source):
                 raise config.error(
                     "Option 'source' in section '%s' must be one of %s, or"
-                    " '<printer object>:<field>[.index]' such as"
+                    " '<printer object>:<field>[.key]' such as"
                     " 'manual_stepper tilt:position'"
                     % (config.get_name(), ", ".join(SHORT_SOURCES))
                 )

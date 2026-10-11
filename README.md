@@ -26,7 +26,7 @@ offset: -2, -42, -127         # file coordinates -> machine coordinates (mm)
 file: models/gantry.glb
 joint: linear                 # fixed, linear or rotary
 axis: 0, 0, 1
-source: z                     # x y z e a b c, machine_x/y/z, or <object>:<field>[.index]
+source: machine_z             # what drives the joint (see below)
 home: 3.0                     # value at which the part sits where it was exported
 
 [model_part tilt]
@@ -47,22 +47,35 @@ All options:
 | | `unit_scale` | `1` | File units to mm (`1000` for files in metres) |
 | | `offset` | `0, 0, 0` | Added to every file's coordinates to place it in machine coordinates |
 | | `color` | from file | Colour of the root part |
+| | `workpiece` | none | Part the print sits on; the G-code viewer's toolpath moves with it |
 | `[model_part name]` | `file` | required | 3D file for this part |
 | | `parent` | root | Part this one rides on |
 | | `joint` | `fixed` | `fixed`, `linear` (`prismatic`) or `rotary` (`revolute`) |
 | | `axis` | required if moving | Direction of travel, or axis of rotation |
 | | `origin` | `0, 0, 0` | A point on the rotation axis (rotary only) |
-| | `source` | required if moving | `x y z e a b c`, `machine_x/y/z`, or `<object>:<field>[.index]` like `manual_stepper tilt:position` |
+| | `source` | required if moving | One of the sources below |
 | | `scale` | `1` | mm (or degrees) per unit of the source |
 | | `home` | `0` | Source value at which the part sits where it was exported |
 | | `minimum`, `maximum` | none | Clamp the joint |
 | | `color` | from file | Hex colour without `#` (a `#` starts a comment in Klipper configs), like `e8620c`; 8 digits add transparency, like `00b9cd40` |
 | | `visible` | `true` | Hide a part; its children still show |
 
+Sources:
+
+| Source | Value |
+|---|---|
+| `machine_x`, `machine_y`, `machine_z` | Physical toolhead position, worked out from the steps the motors have made |
+| `a`, `b`, `c` | Rotary axis angles, from the rotary motors' steps |
+| `x`, `y`, `z`, `e` | G-code position. On a machine with rotary axes this is the position on the part, so it only matches the toolhead while every rotary axis is at 0 |
+| `<object>:<field>[.key]` | Any printer status value, like `manual_stepper tilt:position` or `motion_report:live_steppers.stepper_z1` |
+
+Moving parts should use `machine_*` and `a`/`b`/`c`: a G-code move or a rotation can drive several motors at once, and Kalico works that out, so the model follows what the motors actually do. In the G-code viewer the same sources are worked out from the file instead: the G-code position and A/B/C at that line are turned into machine coordinates with the pivots the kinematics reports.
+
 Files must be inside the config folder. Kalico checks the tree and publishes it as the `model` printer object; Mainsail loads the files from the config folder and moves the parts in the browser:
 
 - **G-code viewer:** the whole printer animates along with the toolpath while scrubbing, simulating or tracking a print.
-- **Dashboard:** a 3D Printer panel next to the webcam and console follows the live printer.
+- **Dashboard:** a 3D Printer panel, placed below the console, follows the live printer.
+- **Toolhead panel:** a jog row for each rotary axis the kinematics has (A and C here), below X, Y and Z. The middle button returns the axis to 0.
 
 Both use the G-code viewer's own scene, so they look the same as the original viewer.
 
@@ -79,29 +92,34 @@ twin\twin.ps1 C:\path\to\config -Port 8081 -NoBrowser
 
 On Linux, `twin/twin.sh <config folder>` does the same.
 
+Settings that only the twin should use go in `twin.cfg` in the config folder. The twin includes it after `printer.cfg` (above the SAVE_CONFIG block), so it overrides the printer's own settings; the printer never reads it. This repo's `config/twin.cfg` turns on the trunnion, which is not wired on the printer yet: `corexy_ac` kinematics, `printer/rotary.cfg` with spare pins, and the tilt and rotary joints of the model. So the twin runs as the full 5-axis machine.
+
 If the twin can't tell an MCU's chip from its serial path (for example a CAN or `/dev/ttyAMA0` MCU), add `twin.json` to the config folder: `{"mcus": {"mcu": {"chip": "stm32f446xx", "serial": "/dev/serial/by-id/usb-Klipper_stm32f446xx_twin"}}}`, keyed by the `[mcu]` section name (`"mcu"`, `"mcu ebb"` and so on).
 
 The config is copied before it is used, so the original is never changed. State the printer keeps outside its config folder (such as `~/variables.cfg` from `[save_variables]`) can go in `config/twin_home/`. The first start builds the firmware dictionaries, about a minute per MCU type, and caches them.
 
-Tested with this repo's config (homing, quad gantry level, probing, heating, and a full print through `PRINT_START` and `PRINT_END`) and with a stock Ender-3 V2 config (homing and heating).
+Tested with this repo's config, both as the printer is now and as a 5-axis machine with `twin.cfg`: homing, quad gantry level, probing, heating, a full print through `PRINT_START` and `PRINT_END`, A/C jogging, and a 5-axis test print that tilts A to 30° and turns C through 270°. Also tested with a stock Ender-3 V2 config (homing and heating).
+
+Kalico only homes with every rotary axis at 0. If the motors were turned off with the table tilted, level it and run `SET_KINEMATIC_POSITION A=0 C=0`, then `G28`.
 
 Limits: there are no real sensor readings, so endstops and probes trigger at the same spot every time, temperatures follow a simple model, and accelerometer data is flat.
 
 ## Tests
 
 ```
-cd mainsail; npx vitest run                     # Mainsail, including the printer model joints
+cd mainsail; npx vitest run                     # Mainsail: model joints, rotary maths, G-code A/B/C index
 docker exec printer-twin /opt/klippy-env/bin/python /opt/printer/tests/test_sim.py
 ```
 
-The twin tests compare the simulated MCU with Kalico's own code: step timing, TMC UART frames, thermistor tables and config reading.
+The Mainsail tests check the browser's machine-position maths against Kalico's `corexy_ac` formula. The twin tests compare the simulated MCU with Kalico's own code: step timing, TMC UART frames, thermistor tables and config reading.
 
 ## Firmware additions (`kalico/`)
 
 - `[model]` / `[model_part]` (`klippy/extras/model.py`).
-- `motion_report` reports `live_pose` (X Y Z A B C) and `live_machine_position`, with a `motion_report/dump_trapq_pose` endpoint.
+- `motion_report` reports `live_steppers` (each motor's position from its step history) and, from those, `live_machine_position` and `live_rotary_position`. It also reports `live_pose` (the G-code X Y Z A B C), with a `motion_report/dump_trapq_pose` endpoint.
 - `corexy_ac` reports `machine_position` and the rotary pivots and limits; `gcode_move` reports `extra_axes`.
 - `temperature_host` can read a stand-in file in the twin.
+- Fixes for `corexy_ac`: quad gantry level and Z tilt use only the Z motors (the X/Y motors also follow Z once the table tilts), and a probe no longer reports "triggered prior to movement" because the X/Y motors it also stops stayed still.
 
 ## Installing on the printer
 
@@ -114,4 +132,4 @@ bash install.sh kalico mainsail
 
 Each part is optional. Old folders are kept as `<name>.orig-<date>`. Copy `config/printer/model.cfg` and `config/models/` into the printer's config folder and add `[include printer/model.cfg]`.
 
-`config/printer/rotary.cfg` still needs the trunnion driver pins; see the notes at the top of that file.
+`config/printer/rotary.cfg` still needs the trunnion driver pins; see the notes at the top of that file. When it is wired, copy the `[printer]`, `[include printer/rotary.cfg]` and `[model_part]` lines from `config/twin.cfg` into the printer's config with the real pins.

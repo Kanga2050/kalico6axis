@@ -212,6 +212,9 @@ class FakeMCU:
         self.is_config = 0
         self.crc = 0
         self.shutdown = 0
+        # trigger points measured in this MCU's old step counts no longer apply
+        for sig in [s for s in REFS if any(m == self.name for m, _ in s)]:
+            del REFS[sig]
         self.steppers = {}
         self.trsyncs = {}
         self.endstops = {}
@@ -446,7 +449,7 @@ class FakeMCU:
             return
         start_w = max(time.monotonic(), START + self.c64(clock) / self.freq)
         es.update(homing=True, trigger_value=pin_value, trsync=trsync_oid, reason=trigger_reason, rest=rest_ticks,
-                  start_w=start_w, first=None, motion_w=None, last_w=None)
+                  start_w=start_w, first=None, motion_w=None, last_w=None, moving=None, first_m=None)
         self.schedule(self.now() + 0.01 * self.freq, lambda: self.endstop_poll(oid))
 
     def linked_steppers(self, ts):
@@ -485,7 +488,6 @@ class FakeMCU:
         if not links and now_w - es["start_w"] < 1.0:
             self.schedule(self.now() + 0.005 * self.freq, lambda: self.endstop_poll(oid))
             return
-        sig = tuple((m.name, s) for m, s in links)
         cur = self.step_vec(links, now_w)
         if es["first"] is None:
             es["first"], es["last_w"] = self.step_vec(links, es["start_w"]), es["start_w"]
@@ -494,14 +496,26 @@ class FakeMCU:
         norm = math.sqrt(sum(d * d for d in delta))
         ref = None
         if links and norm > 2:
+            # Only the steppers this move drives count: an endstop may also stop
+            # steppers that stay still (a probe on a rotary-table machine stops
+            # the X/Y motors too), and the Z endstop and the probe should still
+            # share one physical trigger point when they drive the same steppers
+            if es.get("moving") is None:
+                es["moving"] = [i for i, d in enumerate(delta) if abs(d) > 0.5] or list(range(len(delta)))
+            moving = es["moving"]
+            links = [links[i] for i in moving]
+            cur = [cur[i] for i in moving]
+            es["first_m"] = es.get("first_m") or [es["first"][i] for i in moving]
+            delta = [c - f for c, f in zip(cur, es["first_m"])]
+            norm = math.sqrt(sum(d * d for d in delta))
             direction = [d / norm for d in delta]
-            # endstops that drive the same steppers the same way share one physical trigger point
+            sig = tuple((m.name, s) for m, s in links)
             for r in REFS.get(sig, []):
                 if sum(x * y for x, y in zip(r[2], direction)) > 0.9:
                     ref = r
                     break
         if ref is not None:
-            if self.along(ref, es["first"]) < 0 <= self.along(ref, cur):
+            if self.along(ref, es["first_m"]) < 0 <= self.along(ref, cur):
                 lo, hi = es["last_w"], now_w
                 for _ in range(24):
                     mid = (lo + hi) / 2
@@ -515,8 +529,8 @@ class FakeMCU:
                 es["motion_w"] = now_w
             if es["motion_w"] is not None and now_w >= es["motion_w"] + TRIGGER_DELAY:
                 trig_w = now_w
-                if links and norm:
-                    REFS.setdefault(sig, []).append((sig, cur, [d / norm for d in delta]))
+                if links and norm > 2:
+                    REFS.setdefault(sig, []).append((sig, cur, direction))
         es["last_w"] = now_w
         if now_w - es.get("dbg", 0) > 0.25:
             es["dbg"] = now_w

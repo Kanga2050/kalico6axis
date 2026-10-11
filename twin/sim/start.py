@@ -140,6 +140,24 @@ def link_home_paths():
             os.symlink(home, path)
 
 
+def include_twin_cfg():
+    """Settings only the twin uses (twin.cfg) go in after the printer's own,
+    above the SAVE_CONFIG block, so they override it. The config folder is
+    the launcher's copy, so the printer's files are never touched."""
+    if not os.path.exists(os.path.join(CFG, "twin.cfg")):
+        return
+    path = os.path.join(CFG, "printer.cfg")
+    with open(path, encoding="utf-8", errors="ignore") as f:
+        lines = f.read().split("\n")
+    if "[include twin.cfg]" in (line.strip() for line in lines):
+        return
+    at = next((i for i, line in enumerate(lines) if line.startswith("#*#")), len(lines))
+    lines[at:at] = ["[include twin.cfg]", ""]
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    log("using twin.cfg")
+
+
 def main():
     for d in ("config", "gcodes", "logs", "comms", "database"):
         os.makedirs(os.path.join(DATA, d), exist_ok=True)
@@ -147,6 +165,7 @@ def main():
     if not os.path.exists(os.path.join(CFG, "printer.cfg")):
         log("no printer.cfg in the config folder")
         sys.exit(1)
+    include_twin_cfg()
     procs = []
     os.makedirs("/tmp/twin", exist_ok=True)
     with open("/tmp/twin/host_temp", "w") as f:
