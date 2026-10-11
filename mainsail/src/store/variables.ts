@@ -117,6 +117,7 @@ export const allDashboardPanels = [
     'machine-settings',
     'miniconsole',
     'miscellaneous',
+    'printer-model',
     'spoolman',
     'mmu',
     'temperature',

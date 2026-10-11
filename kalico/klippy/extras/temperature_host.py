@@ -5,6 +5,7 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
 import logging
+import os
 
 from .danger_options import get_danger_options
 
@@ -18,6 +19,10 @@ class Temperature_HOST:
         self.reactor = self.printer.get_reactor()
         self.name = config.get_name().split()[-1]
         self.path = config.get("sensor_path", RPI_PROC_TEMP_FILE)
+        # The printer twin has no host sensors; it points this at a stand-in
+        sim_path = os.environ.get("KLIPPY_SIM_HOST_TEMP_FILE")
+        if sim_path and not os.path.exists(self.path):
+            self.path = sim_path
 
         self.temp = self.min_temp = self.max_temp = 0.0
 

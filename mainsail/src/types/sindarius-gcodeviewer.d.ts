@@ -14,6 +14,7 @@ declare module '@sindarius/gcodeviewer' {
         buildVolume: ViewerBuildVolume
         setBedColor(color: string): void
         setDelta(enabled: boolean): void
+        buildBed(): void
     }
 
     interface ViewerAxes {
@@ -77,16 +78,17 @@ declare module '@sindarius/gcodeviewer' {
         bed: ViewerBed
         axes: ViewerAxes
         buildObjects: ViewerBuildObjects
+        scene: import('@babylonjs/core/scene').Scene
 
         init(): Promise<void>
         resize(): void
         processFile(fileData: string): Promise<void>
         reload(): Promise<void>
-        clearScene(fullReset: boolean): void
+        clearScene(fullReset?: boolean): void
         resetCamera(): void
         forceRender(): void
         simulateToolPosition(): void
-        updateToolPosition(position: ViewerToolPosition[]): void
+        updateToolPosition(position: ViewerToolPosition[] | { x: number; y: number; z: number }): void
         toggleTravels(enabled: boolean): void
         setBackgroundColor(color: string): void
         setCursorVisiblity(visible: boolean): void

@@ -1,2 +1,0 @@
-codespell==2.4.3
-zensical==0.0.68

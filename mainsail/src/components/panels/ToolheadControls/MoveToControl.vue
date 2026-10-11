@@ -76,9 +76,6 @@
                             :disabled="!xAxisHomed || !yAxisHomed || !zAxisHomed"
                             @submit="sendRotary(axis)" />
                     </v-col>
-                    <v-col :class="el.is.xsmall ? 'col-12' : 'col-4'">
-                        <v-btn block outlined :href="twinUrl" target="_blank">Twin</v-btn>
-                    </v-col>
                 </v-row>
             </template>
         </responsive>
@@ -189,14 +186,6 @@ export default class MoveToControl extends Mixins(BaseMixin, ControlMixin) {
         for (const axis of this.rotaryAxes) {
             if (!(axis in this.rotaryInput)) this.$set(this.rotaryInput, axis, this.rotaryPosition(axis))
         }
-    }
-
-    get twinUrl(): string {
-        const host =
-            this.$store.getters['socket/getHostUrl'] ?? `${window.location.protocol}//${window.location.hostname}`
-        const u = new URL(host)
-        const api = `${u.protocol}//${u.hostname}:${this.$store.state.socket.port || 7125}`
-        return `${api}/twin/index.html?printer=${encodeURIComponent(u.hostname + ':' + (this.$store.state.socket.port || 7125))}`
     }
 
     sendRotary(axis: string): void {

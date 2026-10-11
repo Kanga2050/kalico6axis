@@ -1,0 +1,56 @@
+{
+ "units": "mm",
+ "up": "z",
+ "groups": {
+  "frame": 869622,
+  "trunnion": 56152,
+  "tilt": 55224,
+  "rotary": 79568,
+  "gantry": 163600,
+  "beam": 37880,
+  "carriage": 155677,
+  "panels": 1004
+ },
+ "skipped_small": 445,
+ "tilt_axis": {
+  "point": [
+   177.0,
+   217.0,
+   132.0
+  ],
+  "dir": [
+   1.0,
+   0.0,
+   0.0
+  ]
+ },
+ "rotary_axis": {
+  "point": [
+   177.0,
+   217.0,
+   127.0
+  ],
+  "dir": [
+   0.0,
+   0.0,
+   1.0
+  ]
+ },
+ "bed_top_center": [
+  177.0,
+  217.0,
+  127.0
+ ],
+ "nozzle_hits": [],
+ "sizes_kb": {
+  "frame": 17153,
+  "trunnion": 1541,
+  "tilt": 1805,
+  "rotary": 2077,
+  "gantry": 3115,
+  "beam": 745,
+  "carriage": 2897,
+  "panels": 21
+ },
+ "seconds": 88
+}
