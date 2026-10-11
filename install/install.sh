@@ -6,7 +6,7 @@
 set -euo pipefail
 
 STACK="${STACK:-$HOME/printer-stack}"
-REPO="${REPO:-https://github.com/Kanga2050/5-axis-printer.git}"
+REPO="${REPO:-https://github.com/Kanga2050/kalico6axis.git}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 PARTS=("$@")
 [ ${#PARTS[@]} -eq 0 ] && PARTS=(kalico mainsail)

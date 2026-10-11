@@ -30,10 +30,11 @@ def _color(config, option):
     val = config.get(option, None)
     if val is None:
         return None
+    # '#' starts a comment in Klipper configs, so colours are written without it
     if not COLOR_RE.match(val.strip()):
         raise config.error(
-            "Option '%s' in section '%s' must be a hex colour like #e8620c"
-            % (option, config.get_name())
+            "Option '%s' in section '%s' must be a hex colour without '#',"
+            " like e8620c" % (option, config.get_name())
         )
     return "#" + val.strip().lstrip("#").lower()
 

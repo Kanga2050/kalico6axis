@@ -2,9 +2,12 @@
 #   .\twin.ps1                      pick a config folder
 #   .\twin.ps1 C:\path\to\config    use that folder
 #   .\twin.ps1 -Stop                stop the twin
-param([string]$Config, [switch]$Stop, [int]$Port = 8080)
+#   -NoBrowser                      don't open Mainsail when it is ready
+#   -Port 8081                      serve Mainsail on another port
+param([string]$Config, [switch]$Stop, [switch]$NoBrowser, [int]$Port = 8080)
 
-$ErrorActionPreference = 'Stop'
+# Docker writes progress and warnings to stderr; failures are caught from $LASTEXITCODE
+$ErrorActionPreference = 'Continue'
 $repo = Split-Path -Parent $PSScriptRoot
 $work = Join-Path $env:LOCALAPPDATA 'PrinterTwin'
 $name = 'printer-twin'
@@ -48,5 +51,5 @@ for ($i = 0; $i -lt 600; $i++) {
         if ($r.result.klippy_state -eq 'ready') { break }
     } catch { }
 }
-Start-Process "http://localhost:$Port"
+if (-not $NoBrowser) { Start-Process "http://localhost:$Port" }
 Write-Host "Twin running at http://localhost:$Port  (logs: docker logs -f $name)"

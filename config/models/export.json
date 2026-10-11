@@ -43,13 +43,13 @@
  ],
  "nozzle_hits": [],
  "sizes_kb": {
-  "frame": 17153,
-  "trunnion": 1541,
-  "tilt": 1805,
-  "rotary": 2077,
-  "gantry": 3115,
-  "beam": 745,
-  "carriage": 2897,
+  "frame": 17166,
+  "trunnion": 1544,
+  "tilt": 1807,
+  "rotary": 2079,
+  "gantry": 3119,
+  "beam": 748,
+  "carriage": 2902,
   "panels": 21
  },
  "seconds": 88
