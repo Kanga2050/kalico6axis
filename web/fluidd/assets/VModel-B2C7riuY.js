@@ -1,0 +1,1 @@
+import{s as e}from"./_plugin-vue2_normalizer-Bf_8GlX-.js";function t(t){t===void 0&&(t={});var n=`value`;return e(function(e,r){(e.props||={})[n]=t,(e.computed||={})[r]={get:function(){return this[n]},set:function(e){this.$emit(`input`,e)}}})}export{t};

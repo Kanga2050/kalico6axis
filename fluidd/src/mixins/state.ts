@@ -119,7 +119,7 @@ export default class StateMixin extends Vue {
     this.addConsoleEntry(gcode)
   }
 
-  sendMoveGcode (movement: { X?: number, Y?: number, Z?: number }, rate: number, absolute = false, wait?: string) {
+  sendMoveGcode (movement: Record<string, number>, rate: number, absolute = false, wait?: string) {
     const macro: Macro | undefined = this.$typedGetters['macros/getMacroByName']('_CLIENT_LINEAR_MOVE')
 
     const paramSeparator = macro

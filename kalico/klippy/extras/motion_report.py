@@ -121,6 +121,25 @@ class DumpTrapQ:
         self.batch_bulk.add_mux_endpoint(
             "motion_report/dump_trapq", "name", name, api_resp
         )
+        self.last_pose_msg = (0.0, 0.0)
+        self.pose_bulk = bulk_sensor.BatchBulkHelper(
+            printer, self._process_pose_batch
+        )
+        self.pose_bulk.add_mux_endpoint(
+            "motion_report/dump_trapq_pose",
+            "name",
+            name,
+            {
+                "header": (
+                    "time",
+                    "duration",
+                    "start_velocity",
+                    "acceleration",
+                    "start_pose",
+                    "direction",
+                )
+            },
+        )
 
     def extract_trapq(self, start_time, end_time=NEVER_TIME):
         ffi_main, ffi_lib = chelper.get_ffi()
@@ -180,6 +199,24 @@ class DumpTrapQ:
         velocity = move.start_v + move.accel * move_time
         return pos, velocity
 
+    def get_trapq_pose(self, print_time):
+        ffi_main, ffi_lib = chelper.get_ffi()
+        data = ffi_main.new("struct pull_move[1]")
+        count = ffi_lib.trapq_extract_old(self.trapq, data, 1, 0.0, print_time)
+        if not count:
+            return None
+        m = data[0]
+        move_time = max(0.0, min(m.move_t, print_time - m.print_time))
+        dist = (m.start_v + 0.5 * m.accel * move_time) * move_time
+        return [
+            m.start_x + m.x_r * dist,
+            m.start_y + m.y_r * dist,
+            m.start_z + m.z_r * dist,
+            m.start_a + m.a_r * dist,
+            m.start_b + m.b_r * dist,
+            m.start_c + m.c_r * dist,
+        ]
+
     def _process_batch(self, eventtime):
         qtime = self.last_batch_msg[0] + min(self.last_batch_msg[1], 0.100)
         data, cdata = self.extract_trapq(qtime)
@@ -202,6 +239,28 @@ class DumpTrapQ:
         return {"data": d}
 
 
+    def _process_pose_batch(self, eventtime):
+        qtime = self.last_pose_msg[0] + min(self.last_pose_msg[1], 0.100)
+        data, cdata = self.extract_trapq(qtime)
+        d = [
+            (
+                m.print_time,
+                m.move_t,
+                m.start_v,
+                m.accel,
+                (m.start_x, m.start_y, m.start_z, m.start_a, m.start_b, m.start_c),
+                (m.x_r, m.y_r, m.z_r, m.a_r, m.b_r, m.c_r),
+            )
+            for m in data
+        ]
+        if d and d[0][:2] == self.last_pose_msg:
+            d.pop(0)
+        if not d:
+            return {}
+        self.last_pose_msg = d[-1][:2]
+        return {"data": d}
+
+
 STATUS_REFRESH_TIME = 0.250
 
 
@@ -217,6 +276,8 @@ class PrinterMotionReport:
             "live_position": gcode.Coord(0.0, 0.0, 0.0, 0.0),
             "live_velocity": 0.0,
             "live_extruder_velocity": 0.0,
+            "live_pose": [0.0] * 6,
+            "live_machine_position": [0.0, 0.0, 0.0],
             "steppers": [],
             "trapq": [],
         }
@@ -313,6 +374,16 @@ class PrinterMotionReport:
         self.last_status["live_position"] = toolhead.Coord(*(xyzpos + epos))
         self.last_status["live_velocity"] = xyzvelocity
         self.last_status["live_extruder_velocity"] = evelocity
+        pose = self.trapqs["toolhead"].get_trapq_pose(print_time)
+        if pose is not None:
+            self.last_status["live_pose"] = pose
+            kin = toolhead.get_kinematics()
+            if hasattr(kin, "get_machine_position"):
+                self.last_status["live_machine_position"] = list(
+                    kin.get_machine_position(pose)
+                )
+            else:
+                self.last_status["live_machine_position"] = pose[:3]
         return self.last_status
 
 
