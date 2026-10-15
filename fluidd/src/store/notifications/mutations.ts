@@ -1,0 +1,40 @@
+import Vue from 'vue'
+import type { MutationTree } from 'vuex'
+import { createState } from './state'
+import type { NotificationsState, AppNotification } from './types'
+
+export const mutations = {
+  /**
+   * Reset state
+   */
+  setReset (state) {
+    Object.assign(state, createState())
+  },
+
+  setPushNotification (state, n: AppNotification) {
+    state.notifications.push(n)
+  },
+
+  setMergeNotification (state, options: { n: AppNotification; i: number }) {
+    if (options && options.n && options.i >= 0) {
+      Vue.set(state.notifications, options.i, options.n)
+    }
+  },
+
+  setClearNotification (state, notification: AppNotification | string) {
+    let i = -1
+    if (typeof notification === 'string') {
+      i = state.notifications.findIndex(n => n.id === notification)
+    } else {
+      i = state.notifications.findIndex(n => n === notification)
+    }
+    if (i >= 0) {
+      state.notifications.splice(i, 1)
+    }
+  },
+
+  setClearAllNotifications (state) {
+    state.notifications = state.notifications
+      .filter(n => !n.clear)
+  }
+} satisfies MutationTree<NotificationsState>

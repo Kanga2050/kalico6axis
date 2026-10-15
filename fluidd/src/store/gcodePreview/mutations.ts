@@ -1,0 +1,48 @@
+import { markRaw } from 'vue'
+import type { MutationTree } from 'vuex'
+import { createState } from './state'
+import type { BBox, GcodePreviewState, Layer, MoveStore, Part } from './types'
+import type { AppFile, AppFileWithMeta } from '@/store/files/types'
+
+export const mutations = {
+  /**
+   * Reset state
+   */
+  setReset (state) {
+    Object.assign(state, createState())
+  },
+
+  setMoves (state, payload: MoveStore) {
+    state.moves = Object.freeze(payload)
+  },
+
+  setLayers (state, payload: Layer[]) {
+    state.layers = Object.freeze(payload)
+  },
+
+  setParts (state, payload: Part[]) {
+    state.parts = Object.freeze(payload)
+  },
+
+  setTools (state, payload: number[]) {
+    state.tools = Object.freeze(payload)
+  },
+
+  setBounds (state, payload: BBox) {
+    state.bounds = Object.freeze(payload)
+  },
+
+  setFile (state, file: AppFile | AppFileWithMeta | null) {
+    state.file = file
+  },
+
+  setParserProgress (state, payload: number) {
+    state.parserProgress = payload
+  },
+
+  setParserWorker (state, payload: Worker | null) {
+    state.parserWorker = payload != null
+      ? markRaw(payload)
+      : null
+  }
+} satisfies MutationTree<GcodePreviewState>
