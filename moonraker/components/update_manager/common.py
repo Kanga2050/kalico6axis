@@ -42,7 +42,12 @@ BASE_CONFIG: Dict[str, Dict[str, str]] = {
     }
 }
 
-OPTION_OVERRIDES = ("channel", "pinned_commit", "refresh_interval", "report_anomalies")
+# origin and primary_branch let Klipper forks (such as Kalico) and Moonraker
+# forks update from their own repository instead of being reported invalid
+OPTION_OVERRIDES = (
+    "channel", "pinned_commit", "refresh_interval", "report_anomalies",
+    "origin", "primary_branch"
+)
 
 class AppType(ExtendedEnum):
     NONE = 1
