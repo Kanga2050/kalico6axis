@@ -65,6 +65,24 @@ export class TwinScene {
     this.setPose(this.pose)
   }
 
+  // simple stand-in geometry when the CAD export is missing
+  buildPlaceholder() {
+    const m = this.manifest, bc = m.bed_top_center, n = m.nozzle_tip_cad
+    const mat = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 })
+    const box = (g, sx, sy, sz, x, y, z, c) => { const b = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat(c)); b.position.set(x, y, z); this.groups[g].add(b) }
+    const f = [bc[0] - 255, bc[0] + 255, bc[1] - 255, bc[1] + 255, -60, 470]
+    for (const x of [f[0], f[1]]) for (const y of [f[2], f[3]]) box('frame', 20, 20, f[5] - f[4], x, y, (f[4] + f[5]) / 2, 0x2b4f8a)
+    for (const z of [f[4], f[5]]) { for (const y of [f[2], f[3]]) box('frame', f[1] - f[0], 20, 20, bc[0], y, z, 0x2b4f8a); for (const x of [f[0], f[1]]) box('frame', 20, f[3] - f[2], 20, x, bc[1], z, 0x2b4f8a) }
+    for (const x of [f[0] + 20, f[1] - 20]) box('z', 20, f[3] - f[2] - 40, 20, x, bc[1], n[2] + 10, 0x333333)
+    box('y', f[1] - f[0] - 60, 20, 20, bc[0], n[1] + 40, n[2] + 10, 0x333333)
+    box('x', 50, 50, 80, n[0], n[1], n[2] + 45, 0x222222)
+    const c = new THREE.Mesh(new THREE.ConeGeometry(4, 10, 16), mat(0xc9a227)); c.rotation.x = -Math.PI / 2; c.position.set(n[0], n[1], n[2] + 5); this.groups.x.add(c)
+    box('tilt', 260, 100, 12, bc[0], bc[1], bc[2] - 60, 0xe8620c)
+    const bed = new THREE.Mesh(new THREE.CylinderGeometry(110, 110, 3, 64), mat(0xb08d57)); bed.rotation.x = Math.PI / 2; bed.position.set(bc[0], bc[1], bc[2] - 1.5); this.groups.rotary.add(bed)
+    const mark = new THREE.Mesh(new THREE.BoxGeometry(80, 4, 1), mat(0x222222)); mark.position.set(bc[0] + 50, bc[1], bc[2] + 0.5); this.groups.rotary.add(mark)
+    this.setPose(this.pose)
+  }
+
   resize() {
     const c = this.renderer.domElement
     const w = c.clientWidth, h = c.clientHeight
