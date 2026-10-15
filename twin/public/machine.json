@@ -1,0 +1,18 @@
+{
+  "name": "5-Axis Printer (Voron 2.4 350 + trunnion)",
+  "kinematics": "corexy_ac",
+  "toolhead": {
+    "max_velocity": 300,
+    "max_accel": 10000,
+    "max_z_velocity": 15,
+    "max_z_accel": 350,
+    "square_corner_velocity": 5.0,
+    "minimum_cruise_ratio": 0.5,
+    "extruder_instantaneous_corner_velocity": 1.0
+  },
+  "limits": [[0, 350], [0, 350], [-5, 330]],
+  "home": [233, 346, 10],
+  "arc_resolution": 0.1,
+  "rotary_a": { "pivot": [175, 5], "max_velocity": 90, "max_accel": 900, "position_min": -100, "position_max": 100, "instantaneous_corner_velocity": 1.0 },
+  "rotary_c": { "pivot": [175, 175], "max_velocity": 180, "max_accel": 1800, "instantaneous_corner_velocity": 1.0 }
+}
