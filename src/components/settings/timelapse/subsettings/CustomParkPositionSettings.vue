@@ -1,0 +1,111 @@
+<template>
+  <div>
+    <template v-if="['custom', 'x_only'].includes(parkpos)">
+      <v-divider />
+      <app-setting
+        :title="$t('app.timelapse.setting.park_custom_pos_x')"
+        :sub-title="subtitleIfBlocked(getCustomParkPosBlocked('x'))"
+      >
+        <app-text-field
+          :value="parkPosX"
+          :rules="[
+            $rules.required,
+            $rules.numberValid,
+            $rules.numberGreaterThanOrEqual(bedSize.minX),
+            $rules.numberLessThanOrEqual(bedSize.maxX)
+          ]"
+          :disabled="getCustomParkPosBlocked('x')"
+          hide-details="auto"
+          filled
+          dense
+          single-line
+          suffix="mm"
+          submit-on-change
+          @submit="setParkPosX"
+        />
+      </app-setting>
+    </template>
+
+    <template v-if="['custom', 'y_only'].includes(parkpos)">
+      <v-divider />
+      <app-setting
+        :title="$t('app.timelapse.setting.park_custom_pos_y')"
+        :sub-title="subtitleIfBlocked(getCustomParkPosBlocked('y'))"
+      >
+        <app-text-field
+          :value="parkPosY"
+          :rules="[
+            $rules.required,
+            $rules.numberValid,
+            $rules.numberGreaterThanOrEqual(bedSize.minY),
+            $rules.numberLessThanOrEqual(bedSize.maxY)
+          ]"
+          :disabled="getCustomParkPosBlocked('y')"
+          hide-details="auto"
+          filled
+          dense
+          single-line
+          suffix="mm"
+          submit-on-change
+          @submit="setParkPosY"
+        />
+      </app-setting>
+    </template>
+  </div>
+</template>
+
+<script lang="ts">
+import { Component, Mixins } from 'vue-property-decorator'
+import StateMixin from '@/mixins/state'
+import { SocketActions } from '@/api/socketActions'
+import ParkExtrudeRetractSettings from './ParkExtrudeRetractSettings.vue'
+import type { BedSize } from '@/store/printer/types'
+import { defaultWritableSettings } from '@/store/timelapse/state'
+
+@Component({
+  components: {
+    ParkExtrudeRetractSettings
+  }
+})
+export default class CustomParkPositionSettings extends Mixins(StateMixin) {
+  getCustomParkPosBlocked (axis: 'x' | 'y'): boolean {
+    return this.$typedGetters['timelapse/isBlockedSetting'](`park_custom_pos_${axis}`)
+  }
+
+  get parkpos (): Moonraker.Timelapse.ParkPosition {
+    return this.settings.parkpos ?? defaultWritableSettings.parkpos
+  }
+
+  set parkpos (value: Moonraker.Timelapse.ParkPosition) {
+    SocketActions.machineTimelapsePostSettings({ parkpos: value })
+  }
+
+  get parkPosX (): number {
+    return this.settings.park_custom_pos_x ?? defaultWritableSettings.park_custom_pos_x
+  }
+
+  setParkPosX (value: number) {
+    SocketActions.machineTimelapsePostSettings({ park_custom_pos_x: value })
+  }
+
+  get parkPosY (): number {
+    return this.settings.park_custom_pos_y ?? defaultWritableSettings.park_custom_pos_y
+  }
+
+  setParkPosY (value: number) {
+    SocketActions.machineTimelapsePostSettings({ park_custom_pos_y: value })
+  }
+
+  get bedSize (): BedSize {
+    return this.$typedGetters['printer/getBedSize']
+  }
+
+  get settings (): Moonraker.Timelapse.WriteableSettings {
+    return this.$typedState.timelapse.settings ?? defaultWritableSettings
+  }
+
+  subtitleIfBlocked (blocked: boolean): string {
+    return blocked ? this.$tc('app.general.tooltip.managed_by_moonraker') : ''
+  }
+}
+</script>

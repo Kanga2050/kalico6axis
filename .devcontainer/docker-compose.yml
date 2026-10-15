@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  fluidd:
+    build:
+      context: ./
+    volumes:
+      - ..:/workspaces/fluidd/:cached
+      - node-modules:/workspaces/fluidd/node_modules
+      - pnpm-store:/workspaces/fluidd/.pnpm-store
+    command: sleep infinity
+    network_mode: service:klipper-simulavr
+
+  klipper-simulavr:
+    image: ei99070/docker-klipper-simulavr:latest
+    restart: unless-stopped
+
+volumes:
+  node-modules:
+  pnpm-store:

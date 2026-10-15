@@ -1,0 +1,245 @@
+[project]
+site_name = "Fluidd"
+site_url = "https://docs.fluidd.xyz"
+site_description = "A web interface for Klipper 3D printer firmware"
+copyright = "&copy; Fluidd 2026"
+repo_url = "https://github.com/fluidd-core/fluidd"
+repo_name = "fluidd-core/fluidd"
+edit_uri = "edit/master/docs/docs/"
+site_dir = "site"
+extra_css = [
+  "stylesheets/extra.css"
+]
+
+nav = [
+  {"Home" = "index.md"},
+  {"Getting Started" = "getting-started.md"},
+  {"Configuration" = "configuration.md"},
+  {"Customize" = "customize.md"},
+  {"Features" = [
+    "features/index.md",
+    "features/authorization.md",
+    "features/cameras.md",
+    "features/console.md",
+    "features/diagnostics.md",
+    "features/file-editor.md",
+    "features/file-manager.md",
+    "features/job-queue.md",
+    "features/keyboard-shortcuts.md",
+    "features/localization.md",
+    "features/macros.md",
+    "features/multi-material.md",
+    "features/multiple-printers.md",
+    "features/printing.md",
+    "features/slicer-uploads.md",
+    "features/system-and-notifications.md",
+    "features/thermals.md",
+    "features/third-party-integrations.md",
+    "features/timelapse.md",
+    "features/updates.md"
+  ]},
+  {"Development" = "development.md"},
+  {"FAQ" = "faq.md"},
+  {"Sponsors" = "sponsors.md"}
+]
+
+[project.theme]
+variant = "modern"
+logo = "assets/images/fluidd_icon.svg"
+favicon = "favicon.ico"
+features = [
+  "content.action.copy",
+  "content.action.edit",
+  "content.action.view",
+  "content.code.annotate",
+  "content.code.copy",
+  "content.code.select",
+  "content.footnote.tooltips",
+  "content.tabs.link",
+  "content.tooltips",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.instant",
+  "navigation.instant.prefetch",
+  "navigation.instant.preview",
+  "navigation.instant.progress",
+  "navigation.path",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+  "search.share",
+  "toc.follow"
+]
+custom_dir = "overrides"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
+
+# NOTE: declaring this table replaces Zensical's DEFAULT_MARKDOWN_EXTENSIONS
+# wholesale (it is a `config.get(...)`, not a merge), so it has to restate the
+# defaults we want. Keep it in sync with zensical/bootstrap/zensical.toml.
+[project.markdown_extensions]
+abbr = {}
+admonition = {}
+attr_list = {}
+def_list = {}
+footnotes = {}
+md_in_html = {}
+toc.permalink = true
+"pymdownx.betterem" = {}
+"pymdownx.caret" = {}
+"pymdownx.details" = {}
+"pymdownx.emoji".emoji_generator = "zensical.extensions.emoji.to_svg"
+"pymdownx.emoji".emoji_index = "zensical.extensions.emoji.twemoji"
+"pymdownx.highlight".anchor_linenums = true
+"pymdownx.highlight".line_spans = "__span"
+"pymdownx.highlight".pygments_lang_class = true
+"pymdownx.inlinehilite" = {}
+"pymdownx.keys" = {}
+"pymdownx.magiclink" = {}
+"pymdownx.mark" = {}
+"pymdownx.smartsymbols" = {}
+"pymdownx.snippets".auto_append = ["includes/glossary.md"]
+"pymdownx.superfences".custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
+"pymdownx.tabbed".alternate_style = true
+"pymdownx.tabbed".combine_header_slug = true
+"pymdownx.tabbed".slugify = { object = "pymdownx.slugs.slugify", kwds = { case = "lower" } }
+"pymdownx.tasklist".custom_checkbox = true
+"pymdownx.tilde" = {}
+
+[project.plugins.glightbox]
+
+[project.plugins.llmstxt]
+markdown_description = "Fluidd is a free and open-source web interface for Klipper 3D printer firmware, talking to the printer through Moonraker."
+full_output = "llms-full.txt"
+
+[project.plugins.llmstxt.sections]
+"Getting Started" = [
+  "index.md",
+  "getting-started.md",
+  "configuration.md",
+  "customize.md",
+]
+"Features" = ["features/*.md"]
+"Development" = ["development.md"]
+"FAQ" = ["faq.md"]
+
+# The default card layout reads `primary` from the palette, which we leave unset
+# (brand colours live in extra.css), and crashes on it — so pass colours
+# directly. The theme logo is the wide wordmark, which the card crops, so use
+# the square icon; its blues need a dark background to stay visible.
+[project.plugins.social.cards_layout_options]
+background_color = "#1E1E1E"
+color = "#FFFFFF"
+logo = "docs/assets/images/logo.svg"
+
+[project.plugins.minify]
+minify_html = true
+minify_js = true
+minify_css = true
+
+[project.plugins.redirects.redirect_maps]
+# Installation -> Getting Started
+"installation/index.md" = "getting-started.md"
+"installation/kiauh.md" = "getting-started.md#kiauh"
+"installation/docker.md" = "getting-started.md#docker"
+"installation/manual.md" = "getting-started.md#manual-installation"
+"installation/fluiddpi.md" = "getting-started.md#fluiddpi"
+
+# Configuration
+"configuration/initial_setup.md" = "configuration.md#initial-setup"
+"configuration/required.md" = "configuration.md#initial-setup"
+"configuration/moonraker.md" = "configuration.md#moonraker"
+"configuration/moonraker_conf.md" = "configuration.md#example-configuration"
+"configuration/multiple_printers.md" = "configuration.md#multiple-printers"
+"configuration/fluidd_xyz.md" = "getting-started.md#fluiddxyz"
+"configuration/obico_for_remote_access.md" = "features/third-party-integrations.md#obico"
+"configuration/octoeverywhere_free_remote_access.md" = "features/third-party-integrations.md#octoeverywhere"
+
+# Customize
+"customize/layout.md" = "customize.md#application-layout"
+"customize/themes.md" = "customize.md#themes"
+"customize/hide.md" = "customize.md#hiding-components"
+
+# Top-level sections that moved under Features
+"authorization/index.md" = "features/authorization.md"
+"updates/index.md" = "features/updates.md"
+"updates/automated.md" = "features/updates.md#automated-updates"
+"updates/manual.md" = "features/updates.md#manual-updates"
+
+# Features -> Printing
+"features/gcode-viewer.md" = "features/printing.md#g-code-viewer"
+"features/bed_mesh.md" = "features/printing.md#bed-mesh"
+"features/print_history.md" = "features/printing.md#print-history"
+"features/thumbnails.md" = "features/printing.md#thumbnails"
+
+# Features -> Thermals
+"features/chart.md" = "features/thermals.md#chart"
+"features/presets.md" = "features/thermals.md#presets"
+"features/sensors.md" = "features/thermals.md#sensors"
+
+# Features -> Multi-Material
+"features/multiple_extruders.md" = "features/multi-material.md#multiple-extruders"
+"features/spoolman.md" = "features/multi-material.md#spool-management-spoolman"
+
+# Features -> renamed pages
+"features/printers.md" = "features/multiple-printers.md"
+"features/multiple_printers.md" = "features/multiple-printers.md"
+"features/system.md" = "features/system-and-notifications.md#system"
+"features/notifications.md" = "features/system-and-notifications.md#notifications"
+"features/integrations.md" = "features/third-party-integrations.md"
+
+# Development
+"development/localization.md" = "development.md#localization"
+# Corepack dropped in favour of pnpm's own installer — heading renamed
+"development.md#enable-pnpm" = "development.md#install-pnpm"
+"development.md#install-node-v24" = "development.md#install-nodejs"
+
+# Renamed headings
+"features/authorization.md#forced-logins" = "features/authorization.md#understanding-forced-logins"
+"features/cameras.md#crowsnest-support" = "features/cameras.md#crowsnest"
+
+# Per-slicer / per-sensor sections became content tabs — preserve the anchors
+# of the headings they replaced (anchor redirects, Zensical 0.0.61+)
+"features/printing.md#orcaslicer" = "features/printing.md#thumbnails-orcaslicer"
+"features/printing.md#prusaslicer-230" = "features/printing.md#thumbnails-prusaslicer--superslicer"
+"features/printing.md#prusaslicer-220-and-below" = "features/printing.md#thumbnails-prusaslicer--superslicer"
+"features/printing.md#superslicer" = "features/printing.md#thumbnails-prusaslicer--superslicer"
+"features/printing.md#cura" = "features/printing.md#thumbnails-cura"
+
+"features/slicer-uploads.md#orcaslicer" = "features/slicer-uploads.md#slicer-setup-orcaslicer"
+"features/slicer-uploads.md#prusaslicer-superslicer" = "features/slicer-uploads.md#slicer-setup-prusaslicer--superslicer"
+"features/slicer-uploads.md#cura" = "features/slicer-uploads.md#slicer-setup-cura"
+
+"features/thermals.md#host-temperature-raspberry-pi" = "features/thermals.md#sensors-host-temperature"
+"features/thermals.md#mcu-temperature-atsam-atamd-stm32" = "features/thermals.md#sensors-mcu-temperature"
+"features/thermals.md#environmental-sensors" = "features/thermals.md#sensors-environmental-sensors"
+"features/thermals.md#mpc-kalico" = "features/thermals.md#sensors-mpc-kalico"
+"features/thermals.md#aht10-aht20-aht30-temperature-and-humidity" = "features/thermals.md#sensors-environmental-sensors"
+"features/thermals.md#bmp180-bmp280-bmp388-pressure-and-temperature" = "features/thermals.md#sensors-environmental-sensors"
+"features/thermals.md#sht3x-temperature-and-humidity" = "features/thermals.md#sensors-environmental-sensors"
+"features/thermals.md#other-sensors" = "features/thermals.md#sensors-environmental-sensors"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/fluidd-core/fluidd"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/discord"
+link = "https://discord.gg/GZ3D5tqfcF"
