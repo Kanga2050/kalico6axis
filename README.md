@@ -10,7 +10,7 @@ Everything that runs my 5-axis printer (a Voron 2.4 350 with an A/C trunnion bed
 | `web/mainsail/` | That Mainsail, built and ready to serve | – |
 | `config/` | My printer config, with `printer/model.cfg` and the coloured CAD parts in `models/` | – |
 | `twin/` | The digital twin: the whole stack running on a PC with simulated MCUs | – |
-| `install/` | `install.sh` for the Pi | – |
+| `install/` | `publish.sh`, which builds the branches and release printers install | – |
 
 ## 3D model of the printer
 
@@ -123,13 +123,41 @@ The Mainsail tests check the browser's machine-position maths against Kalico's `
 
 ## Installing on the printer
 
-On the Pi:
+Printers install three published pieces, which `install/publish.sh` builds from this repo after each change:
+
+| Piece | Where | Installed at |
+|---|---|---|
+| Kalico | branch `kalico` (Kalico `rotation-support` plus the changes in `kalico/`) | `~/klipper` |
+| Moonraker | branch `moonraker` (upstream Moonraker plus the changes in `moonraker/`) | `~/moonraker` |
+| Mainsail | release asset `mainsail.zip` (built from `web/mainsail`) | `~/mainsail` |
+
+On a KIAUH Pi, point the existing folders at them:
 
 ```
-curl -O https://raw.githubusercontent.com/Kanga2050/kalico6axis/main/install/install.sh
-bash install.sh kalico mainsail
+cd ~/klipper && git remote set-url origin https://github.com/Kanga2050/kalico6axis.git && git fetch origin kalico && git checkout -B kalico origin/kalico
+cd ~/moonraker && git remote set-url origin https://github.com/Kanga2050/kalico6axis.git && git fetch origin moonraker && git checkout -B moonraker origin/moonraker
 ```
 
-Each part is optional. Old folders are kept as `<name>.orig-<date>`. Copy `config/printer/model.cfg` and `config/models/` into the printer's config folder and add `[include printer/model.cfg]`.
+Then in `moonraker.conf`, so the update manager follows this repo:
+
+```
+[update_manager klipper]
+origin: https://github.com/Kanga2050/kalico6axis.git
+primary_branch: kalico
+
+[update_manager moonraker]
+origin: https://github.com/Kanga2050/kalico6axis.git
+primary_branch: moonraker
+
+[update_manager mainsail]
+type: web
+channel: stable
+repo: Kanga2050/kalico6axis
+path: ~/mainsail
+```
+
+Mainsail then installs from the update manager. In `~/kiauh/kiauh.cfg`, the Klipper and Moonraker `repositories` are `https://github.com/Kanga2050/kalico6axis, kalico` and `https://github.com/Kanga2050/kalico6axis, moonraker`.
+
+For the 3D model, copy `config/printer/model.cfg` and `config/models/` into the printer's config folder and add `[include printer/model.cfg]`.
 
 `config/printer/rotary.cfg` still needs the trunnion driver pins; see the notes at the top of that file. When it is wired, copy the `[printer]`, `[include printer/rotary.cfg]` and `[model_part]` lines from `config/twin.cfg` into the printer's config with the real pins.
