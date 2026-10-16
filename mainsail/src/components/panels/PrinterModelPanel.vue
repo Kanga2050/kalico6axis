@@ -102,8 +102,9 @@ export default class PrinterModelPanel extends Mixins(BaseMixin) {
     @Watch('modelConfig')
     async loadModel() {
         if (!this.gl.viewer) return
+        // the store hands out a new object on status updates; only reload on a real change
         const key = JSON.stringify(this.modelConfig)
-        if (key === this.gl.key && this.gl.model) return
+        if (key === this.gl.key) return
         this.gl.key = key
         this.gl.model?.dispose()
         this.gl.model = null
@@ -111,6 +112,11 @@ export default class PrinterModelPanel extends Mixins(BaseMixin) {
         const viewerScene = this.gl.viewer.scene
         const model = new PrinterModel(viewerScene, this.apiUrl + '/server/files/config')
         await model.load(this.modelConfig)
+        if (key !== this.gl.key || !this.gl.viewer) {
+            // a newer config arrived (or the panel closed) while this one loaded
+            model.dispose()
+            return
+        }
         this.gl.model = model
         model.fitCamera()
         viewerScene.executeWhenReady(() => viewerScene.render())

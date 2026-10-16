@@ -38,7 +38,28 @@ origin: 175, 175, 5           # a point on the axis
 source: a
 ```
 
-Files can be `.glb`, `.gltf`, `.stl` or `.obj`, with an optional `color:` per part. Kalico checks the tree and publishes it as the `model` printer object; Mainsail loads the files from the config folder and moves the parts in the browser:
+All options:
+
+| Section | Option | Default | Meaning |
+|---|---|---|---|
+| `[model]` | `file` | none | Root part, fixed to the machine |
+| | `up_axis` | `z` | `z` for CAD/STL exports, `y` for standard glTF |
+| | `unit_scale` | `1` | File units to mm (`1000` for files in metres) |
+| | `offset` | `0, 0, 0` | Added to every file's coordinates to place it in machine coordinates |
+| | `color` | from file | Colour of the root part |
+| `[model_part name]` | `file` | required | 3D file for this part |
+| | `parent` | root | Part this one rides on |
+| | `joint` | `fixed` | `fixed`, `linear` (`prismatic`) or `rotary` (`revolute`) |
+| | `axis` | required if moving | Direction of travel, or axis of rotation |
+| | `origin` | `0, 0, 0` | A point on the rotation axis (rotary only) |
+| | `source` | required if moving | `x y z e a b c`, `machine_x/y/z`, or `<object>:<field>[.index]` like `manual_stepper tilt:position` |
+| | `scale` | `1` | mm (or degrees) per unit of the source |
+| | `home` | `0` | Source value at which the part sits where it was exported |
+| | `minimum`, `maximum` | none | Clamp the joint |
+| | `color` | from file | Hex colour without `#` (a `#` starts a comment in Klipper configs), like `e8620c`; 8 digits add transparency, like `00b9cd40` |
+| | `visible` | `true` | Hide a part; its children still show |
+
+Files must be inside the config folder. Kalico checks the tree and publishes it as the `model` printer object; Mainsail loads the files from the config folder and moves the parts in the browser:
 
 - **G-code viewer:** the whole printer animates along with the toolpath while scrubbing, simulating or tracking a print.
 - **Dashboard:** a 3D Printer panel next to the webcam and console follows the live printer.
@@ -53,11 +74,27 @@ The twin runs the real Kalico, Moonraker and Mainsail on a PC with Docker Deskto
 twin\twin.ps1                    # pick a config folder; opens Mainsail at http://localhost:8080
 twin\twin.ps1 C:\path\to\config
 twin\twin.ps1 -Stop
+twin\twin.ps1 C:\path\to\config -Port 8081 -NoBrowser
 ```
+
+On Linux, `twin/twin.sh <config folder>` does the same.
+
+If the twin can't tell an MCU's chip from its serial path (for example a CAN or `/dev/ttyAMA0` MCU), add `twin.json` to the config folder: `{"mcus": {"mcu": {"chip": "stm32f446xx", "serial": "/dev/serial/by-id/usb-Klipper_stm32f446xx_twin"}}}`, keyed by the `[mcu]` section name (`"mcu"`, `"mcu ebb"` and so on).
 
 The config is copied before it is used, so the original is never changed. State the printer keeps outside its config folder (such as `~/variables.cfg` from `[save_variables]`) can go in `config/twin_home/`. The first start builds the firmware dictionaries, about a minute per MCU type, and caches them.
 
-Tested with this repo's config: homing, quad gantry level, probing, heating, and a full print through `PRINT_START` and `PRINT_END`.
+Tested with this repo's config (homing, quad gantry level, probing, heating, and a full print through `PRINT_START` and `PRINT_END`) and with a stock Ender-3 V2 config (homing and heating).
+
+Limits: there are no real sensor readings, so endstops and probes trigger at the same spot every time, temperatures follow a simple model, and accelerometer data is flat.
+
+## Tests
+
+```
+cd mainsail; npx vitest run                     # Mainsail, including the printer model joints
+docker exec printer-twin /opt/klippy-env/bin/python /opt/printer/tests/test_sim.py
+```
+
+The twin tests compare the simulated MCU with Kalico's own code: step timing, TMC UART frames, thermistor tables and config reading.
 
 ## Firmware additions (`kalico/`)
 
@@ -71,7 +108,7 @@ Tested with this repo's config: homing, quad gantry level, probing, heating, and
 On the Pi:
 
 ```
-curl -O https://raw.githubusercontent.com/Kanga2050/5-axis-printer/main/install/install.sh
+curl -O https://raw.githubusercontent.com/Kanga2050/kalico6axis/main/install/install.sh
 bash install.sh kalico mainsail
 ```
 

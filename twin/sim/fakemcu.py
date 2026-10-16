@@ -56,7 +56,7 @@ class Stepper:
     @staticmethod
     def offset(move, k):
         _, i, a, a2, _, _, _ = move
-        return k * i + a * k * (k - 1) / 2.0 + a2 * (k - 1) * k * (k + 1) / 6.0
+        return k * i + a * k * (k - 1) / 2.0 + a2 * k * (k - 1) * (k - 2) / 6.0
 
     def queue(self, interval, count, add, add2=0, shift=0):
         scale = 2.0 ** (-shift)

@@ -25,7 +25,9 @@ def read_config(path, seen=None):
     seen.add(path)
     out = []
     section = None
-    for raw in open(path, encoding="utf-8", errors="ignore").read().split("\n"):
+    with open(path, encoding="utf-8", errors="ignore") as f:
+        text = f.read()
+    for raw in text.split("\n"):
         if raw.startswith("#*#"):
             # SAVE_CONFIG block: values Klipper merges into the sections above
             raw = raw[3:].strip()

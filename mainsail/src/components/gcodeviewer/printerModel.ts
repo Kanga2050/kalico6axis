@@ -167,7 +167,9 @@ export class PrinterModel {
         this.loading = Promise.all(this.parts.map((p) => this.loadPart(p))).then(() => {
             this.update(this.lastValues)
             // the gcodeviewer renders on demand; draw again once the new shaders are compiled
-            this.scene.executeWhenReady(() => this.scene.render())
+            this.scene.executeWhenReady(() => {
+                if (!this.scene.isDisposed && this.scene.activeCamera) this.scene.render()
+            })
         })
         await this.loading
     }
@@ -195,7 +197,10 @@ export class PrinterModel {
             return d
         }
         nodes.sort((a, b) => depth(a) - depth(b)).forEach((n) => n.computeWorldMatrix(true))
-        const color = part.cfg.color ? Color3.FromHexString(part.cfg.color) : null
+        // config colours are #rrggbb or #rrggbbaa
+        const hex = part.cfg.color?.replace('#', '') ?? ''
+        const color = hex.length >= 6 ? Color3.FromHexString('#' + hex.slice(0, 6)) : null
+        const colorAlpha = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : null
         for (const m of result.meshes) {
             if (!(m instanceof Mesh) || !m.getTotalVertices()) continue
             m.computeWorldMatrix(true)
@@ -215,7 +220,7 @@ export class PrinterModel {
             mat.diffuseColor = base
             mat.emissiveColor = base.scale(0.35)
             mat.specularColor = (pbr?.metallic ?? 0) > 0.5 ? new Color3(0.5, 0.5, 0.5) : new Color3(0.12, 0.12, 0.12)
-            mat.alpha = pbr?.alpha ?? 1
+            mat.alpha = colorAlpha ?? pbr?.alpha ?? 1
             if (mat.alpha < 1) mat.backFaceCulling = false
             if (m.material && m.material !== mat) m.material.dispose()
             m.material = mat

@@ -27,7 +27,8 @@ COPY moonraker /opt/printer/moonraker
 RUN find /opt/printer/moonraker -type f -name '*.py' -exec sed -i 's/\r$//' {} +
 COPY web/mainsail /opt/printer/mainsail
 COPY twin/sim /opt/printer/sim
-RUN sed -i 's/\r$//' /opt/printer/sim/*.py /opt/printer/sim/nginx.conf \
+COPY twin/tests /opt/printer/tests
+RUN sed -i 's/\r$//' /opt/printer/sim/*.py /opt/printer/tests/*.py /opt/printer/sim/nginx.conf \
     && cp /opt/printer/sim/nginx.conf /etc/nginx/conf.d/twin.conf
 
 VOLUME ["/data/printer_data/gcodes", "/data/cache"]
