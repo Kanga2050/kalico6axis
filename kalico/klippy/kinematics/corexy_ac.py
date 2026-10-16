@@ -115,6 +115,19 @@ class CoreXYACKinematics(corexy.CoreXYKinematics):
             [0.5 * (pos[0] + pos[1]), 0.5 * (pos[0] - pos[1]), pos[2]], a, c
         )
 
+    def get_z_steppers(self):
+        # the X/Y motors also follow Z once the table tilts, so they report
+        # Z as active; gantry levelling only wants the Z rail's motors
+        return self.rails[2].get_steppers()
+
+    def calc_machine_position(self, stepper_positions):
+        pos = [stepper_positions[rail.get_name()] for rail in self.rails]
+        rotary = {
+            ra.axis: stepper_positions[ra.stepper.get_name()]
+            for ra in self.rotary
+        }
+        return [0.5 * (pos[0] + pos[1]), 0.5 * (pos[0] - pos[1]), pos[2]], rotary
+
     def get_machine_position(self, pose):
         return self._to_machine(pose)
 

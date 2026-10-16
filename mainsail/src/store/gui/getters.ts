@@ -122,13 +122,25 @@ export const getters: GetterTree<GuiState, RootState> = {
 
             panels = panels?.filter((element) => element !== null) ?? []
             const allPossiblePanels = getters['getAllPossiblePanels']
+            const allViewportPanels = getters['getAllPanelsFromViewport'](viewport) as GuiStateLayoutoption[]
+            const isMissing = (name: string) =>
+                allPossiblePanels.includes(name) && !allViewportPanels.find((panel) => panel.name === name)
+
+            // a new 3D printer panel goes right below the console, wherever the console is
+            const consoleIndex = panels.findIndex((panel) => panel.name === 'miniconsole')
+            const modelBesideConsole =
+                isMissing('printer-model') && allViewportPanels.some((panel) => panel.name === 'miniconsole')
+            if (modelBesideConsole && consoleIndex !== -1) {
+                panels = [...panels]
+                panels.splice(consoleIndex + 1, 0, { name: 'printer-model', visible: true })
+            }
 
             if (column < 2) {
-                const allViewportPanels = getters['getAllPanelsFromViewport'](viewport) as GuiStateLayoutoption[]
                 const missingPanels: GuiStateLayoutoption[] = []
 
                 allPossiblePanels.forEach((panelname: string) => {
-                    if (!allViewportPanels.find((panel) => panel.name === panelname))
+                    if (panelname === 'printer-model' && modelBesideConsole) return
+                    if (isMissing(panelname))
                         missingPanels.push({
                             name: panelname,
                             visible: true,

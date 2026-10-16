@@ -89,6 +89,7 @@
         <!-- AXIS CONTROL -->
         <v-container v-if="axisControlVisible">
             <component :is="`${controlStyle}-control`" />
+            <rotary-control class="mt-1" />
         </v-container>
         <!-- Z-OFFSET CONTROL -->
         <v-divider v-if="showZOffset" />
@@ -123,6 +124,7 @@ import ControlMixin from '@/components/mixins/control'
 import CrossControl from '@/components/panels/ToolheadControls/CrossControl.vue'
 import MoveToControl from '@/components/panels/ToolheadControls/MoveToControl.vue'
 import Panel from '@/components/ui/Panel.vue'
+import RotaryControl from '@/components/panels/ToolheadControls/RotaryControl.vue'
 import ToolSlider from '@/components/inputs/ToolSlider.vue'
 import ZoffsetControl from '@/components/panels/ToolheadControls/ZoffsetControl.vue'
 import { mdiDotsVertical, mdiEngineOff, mdiGamepad, mdiSpeedometer, mdiMenuDown, mdiRestore } from '@mdi/js'
@@ -134,6 +136,7 @@ import { mdiDotsVertical, mdiEngineOff, mdiGamepad, mdiSpeedometer, mdiMenuDown,
         CrossControl,
         MoveToControl,
         Panel,
+        RotaryControl,
         ToolSlider,
         ZoffsetControl,
     },

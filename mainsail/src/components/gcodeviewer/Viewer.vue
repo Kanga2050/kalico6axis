@@ -280,6 +280,10 @@ import {
 } from '@mdi/js'
 import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog.vue'
 import { PrinterModel, ModelConfig, ToolPosition, readSource } from '@/components/gcodeviewer/printerModel'
+import { indexRotary, rotaryAt, RotaryStep } from '@/components/gcodeviewer/rotaryIndex'
+import { TransformNode } from '@babylonjs/core/Meshes/transformNode'
+import { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh'
+import { Matrix, Vector3 } from '@babylonjs/core/Maths/math.vector'
 import { Debounce } from 'vue-debounce-decorator'
 
 interface downloadSnackbar {
@@ -305,6 +309,12 @@ let viewer: GCodeViewerInstance | null = null
 let printerModel: PrinterModel | null = null
 let printerModelSeq = 0
 let printerModelFitted = false
+// the toolpath and tool cursor hang from this node, which follows the model's workpiece part
+let workpieceNode: TransformNode | null = null
+let rotarySteps: RotaryStep[] = []
+let rotaryText: string | null = null
+// viewer meshes that stay put when the workpiece moves
+const FIXED_MESHES = /^(bed|BuildPlate|axis|TextPlane)/
 @Component({
     components: { ConfirmationDialog, Panel, CodeStream },
 })
@@ -1184,7 +1194,57 @@ export default class Viewer extends Mixins(BaseMixin) {
             if (printerModel) printerModel.parts = []
             this.loadPrinterModel()
         }
+        // toolpath meshes are created as the file renders; hang new ones on the workpiece
+        v.scene.onNewMeshAddedObservable.add((mesh: AbstractMesh) => {
+            Promise.resolve().then(() => this.attachToWorkpiece(mesh))
+        })
         this.loadPrinterModel()
+    }
+
+    attachToWorkpiece(node: AbstractMesh | TransformNode) {
+        if (!workpieceNode || workpieceNode.isDisposed() || node === workpieceNode || node.isDisposed()) return
+        if (node.parent || FIXED_MESHES.test(node.name)) return
+        if (printerModel?.meshes().includes(node as AbstractMesh)) return
+        node.parent = workpieceNode
+        if (node.isWorldMatrixFrozen) node.freezeWorldMatrix()
+    }
+
+    // move the toolpath and tool cursor with the part the print sits on
+    moveWorkpiece() {
+        const scene = viewer?.scene
+        if (!scene || !printerModel) return
+        const matrix = printerModel.workpieceMatrix()
+        if (!matrix && !workpieceNode) return
+        if (!workpieceNode || workpieceNode.isDisposed() || workpieceNode.getScene() !== scene)
+            workpieceNode = new TransformNode('workpiece', scene)
+        workpieceNode.freezeWorldMatrix(matrix ?? Matrix.Identity())
+        for (const mesh of scene.meshes) this.attachToWorkpiece(mesh)
+        for (const node of scene.transformNodes) if (node.name === 'toolCursorContainer') this.attachToWorkpiece(node)
+        for (const child of workpieceNode.getChildren()) {
+            if (child instanceof TransformNode && child.isWorldMatrixFrozen) child.freezeWorldMatrix()
+        }
+    }
+
+    // A, B, C at the viewer's current line, eased along the line while simulating
+    rotaryPose(position: Vector3): number[] {
+        if (!viewer) return [0, 0, 0]
+        if (rotaryText !== viewer.fileData) {
+            rotaryText = viewer.fileData
+            rotarySteps = rotaryText ? indexRotary(rotaryText) : []
+        }
+        if (!rotarySteps.length) return [0, 0, 0]
+        const gp = viewer.gcodeProcessor as unknown as {
+            renderedLines?: { start: Vector3; end: Vector3; gcodeFilePosition: number }[]
+            lastFilePositionIndex?: number
+        }
+        const line = gp.renderedLines?.[gp.lastFilePositionIndex ?? -1]
+        if (!line) return rotaryAt(rotarySteps, Infinity)
+        const before = rotaryAt(rotarySteps, line.gcodeFilePosition)
+        const after = rotaryAt(rotarySteps, line.gcodeFilePosition + 1)
+        const length = Vector3.Distance(line.start, line.end)
+        const along = length > 0 ? Vector3.Distance(line.start, position) / length : 1
+        const t = isFinite(along) ? Math.min(1, Math.max(0, along)) : 1
+        return before.map((b, i) => b + (after[i] - b) * t)
     }
 
     async loadPrinterModel() {
@@ -1211,12 +1271,13 @@ export default class Viewer extends Mixins(BaseMixin) {
 
     movePrinterModel(position: ToolPosition | null) {
         if (printerModel === null) return
+        // scrubbing or simulating: pose the machine from the file (G-code x, y, z, a, b, c);
+        // live tracking passes the axes array and the machine follows the motors instead
         let sim: number[] | null = null
-        if (position && 'x' in position) sim = [position.x, position.z, position.y]
-        else if (Array.isArray(position)) {
-            sim = [0, 0, 0]
-            for (const p of position) sim['XYZ'.indexOf(p.axes)] = p.position
-            sim = sim.map((v, i) => v + (this.gcodeOffset[i] ?? 0))
+        if (position && 'x' in position) {
+            const p = new Vector3(position.x, position.y, position.z)
+            const rotary = printerModel.sources().some((s) => ['a', 'b', 'c'].includes(s))
+            sim = [p.x, p.z, p.y, ...(rotary ? this.rotaryPose(p) : [0, 0, 0])]
         }
         const printer = this.$store.state.printer
         const values: Record<string, number> = {}
@@ -1225,6 +1286,7 @@ export default class Viewer extends Mixins(BaseMixin) {
             if (v !== null) values[src] = v
         }
         printerModel.update(values)
+        this.moveWorkpiece()
         viewer?.scene?.render()
     }
 

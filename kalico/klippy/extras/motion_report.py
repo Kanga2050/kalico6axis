@@ -278,6 +278,8 @@ class PrinterMotionReport:
             "live_extruder_velocity": 0.0,
             "live_pose": [0.0] * 6,
             "live_machine_position": [0.0, 0.0, 0.0],
+            "live_rotary_position": {},
+            "live_steppers": {},
             "steppers": [],
             "trapq": [],
         }
@@ -377,13 +379,25 @@ class PrinterMotionReport:
         pose = self.trapqs["toolhead"].get_trapq_pose(print_time)
         if pose is not None:
             self.last_status["live_pose"] = pose
-            kin = toolhead.get_kinematics()
-            if hasattr(kin, "get_machine_position"):
-                self.last_status["live_machine_position"] = list(
-                    kin.get_machine_position(pose)
-                )
+        # Machine position from the steps each motor has actually taken
+        steppers = {}
+        for name, ds in self.steppers.items():
+            ms = ds.mcu_stepper
+            steppers[name] = ms.mcu_to_commanded_position(
+                ms.get_past_mcu_position(print_time)
+            )
+        self.last_status["live_steppers"] = steppers
+        kin = toolhead.get_kinematics()
+        try:
+            if hasattr(kin, "calc_machine_position"):
+                machine, rotary = kin.calc_machine_position(steppers)
             else:
-                self.last_status["live_machine_position"] = pose[:3]
+                machine, rotary = kin.calc_position(steppers)[:3], {}
+        except KeyError:
+            machine, rotary = None, {}
+        if machine is not None:
+            self.last_status["live_machine_position"] = list(machine)
+        self.last_status["live_rotary_position"] = rotary
         return self.last_status
 
 

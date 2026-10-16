@@ -34,6 +34,7 @@ export interface ModelConfig {
     up_axis: 'z' | 'y'
     unit_scale: number
     offset: number[]
+    workpiece?: string | null
     root: ModelPartConfig
     parts: ModelPartConfig[]
 }
@@ -92,26 +93,56 @@ function num(v: unknown): number | null {
     return typeof v === 'number' && !isNaN(v) ? v : null
 }
 
-// value of a joint source from Klipper status, or from a simulated position
+const ROTARY: Record<string, number> = { a: 3, b: 4, c: 5 }
+
+interface RotaryAxis {
+    axis: 'x' | 'y' | 'z'
+    pivot: number[]
+}
+
+// G-code pose (x, y, z, a, b, c) -> machine position, using the rotary axes
+// the kinematics reports. The part is turned by C first, then tilted by A
+// (and B), the same order as Kalico's rotary-table kinematics.
+export function poseToMachine(pose: number[], printer: unknown): number[] {
+    const p = [pose[0] ?? 0, pose[1] ?? 0, pose[2] ?? 0]
+    const axes = (dig(printer, 'toolhead', 'rotary_axes') ?? {}) as Record<string, RotaryAxis>
+    for (const name of ['c', 'b', 'a']) {
+        const ra = axes[name]
+        const deg = pose[ROTARY[name]] ?? 0
+        if (!ra || !deg) continue
+        // the two coordinates turned by this axis, and its pivot in them
+        const [i, j] = ra.axis === 'x' ? [1, 2] : ra.axis === 'y' ? [2, 0] : [0, 1]
+        const t = (deg * Math.PI) / 180
+        const di = p[i] - ra.pivot[0]
+        const dj = p[j] - ra.pivot[1]
+        p[i] = ra.pivot[0] + di * Math.cos(t) - dj * Math.sin(t)
+        p[j] = ra.pivot[1] + di * Math.sin(t) + dj * Math.cos(t)
+    }
+    return p
+}
+
+// Value of a joint source. Live values come from Klipper status, with
+// machine_* and a/b/c taken from the steps the motors have made. With a
+// simulated G-code pose (G-code viewer) they are worked out from that pose.
 export function readSource(source: string, printer: unknown, sim?: number[] | null): number | null {
     if (source in AXES || source.startsWith('machine_')) {
         const i = AXES[source.replace('machine_', '')]
-        if (sim) return sim[i] ?? 0
         const machine = source.startsWith('machine_')
-            ? num(dig(printer, 'motion_report', 'live_machine_position', i))
-            : null
+        if (sim) return machine ? poseToMachine(sim, printer)[i] : sim[i] ?? 0
         return (
-            machine ??
+            (machine ? num(dig(printer, 'motion_report', 'live_machine_position', i)) : null) ??
             num(dig(printer, 'motion_report', 'live_position', i)) ??
             num(dig(printer, 'toolhead', 'position', i))
         )
     }
     if (source === 'e')
         return num(dig(printer, 'motion_report', 'live_position', 3)) ?? num(dig(printer, 'toolhead', 'position', 3))
-    if (['a', 'b', 'c'].includes(source)) {
-        const i = { a: 3, b: 4, c: 5 }[source] as number
+    if (source in ROTARY) {
+        if (sim) return sim[ROTARY[source]] ?? 0
+        const motor = num(dig(printer, 'motion_report', 'live_rotary_position', source))
+        if (motor !== null) return motor
         const pose = dig(printer, 'motion_report', 'live_pose')
-        if (Array.isArray(pose) && pose.some((v) => v)) return num(pose[i])
+        if (Array.isArray(pose) && pose.some((v) => v)) return num(pose[ROTARY[source]])
         return num(dig(printer, 'toolhead', 'extra_axes', source.toUpperCase())) ?? 0
     }
     const [obj, path] = source.split(':')
@@ -260,6 +291,15 @@ export class PrinterModel {
             const sceneMatrix = Qi.multiply(part.world).multiply(Q)
             for (const m of part.meshes) m.freezeWorldMatrix(sceneMatrix)
         }
+    }
+
+    // scene transform of the part the print sits on (the [model] workpiece),
+    // so the toolpath can move with it; null when there is none
+    workpieceMatrix(): Matrix | null {
+        const name = this.config?.workpiece
+        const part = name ? this.parts.find((p) => p.cfg.name === name) : undefined
+        if (!part) return null
+        return Q.clone().invert().multiply(part.world).multiply(Q)
     }
 
     // point the viewer's orbit camera at the whole machine
