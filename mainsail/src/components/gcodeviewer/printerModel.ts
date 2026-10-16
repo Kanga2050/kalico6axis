@@ -8,6 +8,8 @@ import { Color3 } from '@babylonjs/core/Maths/math.color'
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader'
 import { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh'
 import { Mesh } from '@babylonjs/core/Meshes/mesh'
+import { TransformNode } from '@babylonjs/core/Meshes/transformNode'
+import { Observer } from '@babylonjs/core/Misc/observable'
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial'
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial'
 import '@babylonjs/loaders/glTF'
@@ -44,6 +46,9 @@ export type ModelValues = Record<string, number>
 export type ToolPosition = { axes: string; position: number }[] | { x: number; y: number; z: number }
 
 const AXES: Record<string, number> = { x: 0, y: 1, z: 2 }
+
+// gcodeviewer meshes that stay put when the workpiece moves
+const FIXED_MESHES = /^(bed|BuildPlate|axis|TextPlane)/
 
 // machine (Z up, right handed) -> gcodeviewer scene (x, z, y)
 const Q = Matrix.FromValues(1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1)
@@ -167,10 +172,24 @@ export class PrinterModel {
     baseUrl: string
     loading: Promise<void> | null = null
     lastValues: ModelValues = {}
+    private meshAdded: Observer<AbstractMesh> | null = null
 
     constructor(scene: Scene, baseUrl: string) {
         this.scene = scene
         this.baseUrl = baseUrl.replace(/\/$/, '')
+    }
+
+    // The gcodeviewer's clearScene (also run by processFile) disposes every mesh in
+    // the scene; this keeps the model's meshes through it.
+    static keepThroughClear(viewer: { clearScene(clearFile?: boolean): void }, model: () => PrinterModel | null) {
+        const clearScene = viewer.clearScene.bind(viewer)
+        viewer.clearScene = (clearFile?: boolean) => {
+            const m = model()
+            const meshes = m?.meshes() ?? []
+            for (const mesh of meshes) m!.scene.removeMesh(mesh)
+            clearScene(clearFile)
+            for (const mesh of meshes) m!.scene.addMesh(mesh)
+        }
     }
 
     // file coordinates -> machine coordinates
@@ -191,6 +210,14 @@ export class PrinterModel {
         this.dispose()
         this.config = config
         STLFileLoader.DO_NOT_ALTER_FILE_COORDINATES = true
+        // toolpath meshes appear as a file renders; hang them on the workpiece,
+        // and keep a rebuilt bed hidden when the model has its own moving table
+        this.meshAdded = this.scene.onNewMeshAddedObservable.add((mesh) =>
+            Promise.resolve().then(() => {
+                if (mesh.name === 'BuildPlate') this.update(this.lastValues)
+                else this.attach(mesh)
+            })
+        )
         const all = [{ ...config.root, name: 'root', joint: 'fixed' as const }, ...config.parts]
         const byName: Record<string, Part> = {}
         for (const cfg of all) {
@@ -309,6 +336,34 @@ export class PrinterModel {
             const mesh = this.scene.getMeshByName(name)
             if (mesh) mesh.isVisible = !moving
         }
+        this.follow()
+    }
+
+    // the gcodeviewer's toolpath hangs from this node, which follows the workpiece part
+    private workpieceNode(create: boolean): TransformNode | null {
+        const node = this.scene.getTransformNodeByName('workpiece')
+        return node ?? (create ? new TransformNode('workpiece', this.scene) : null)
+    }
+
+    private attach(mesh: AbstractMesh) {
+        const node = this.workpieceNode(false)
+        if (!node || mesh.isDisposed() || mesh.parent || FIXED_MESHES.test(mesh.name)) return
+        // model meshes, including ones still loading, are not toolpath
+        if (mesh.metadata?.printerModel || PrinterModel.importing > 0) return
+        mesh.parent = node
+        if (mesh.isWorldMatrixFrozen) mesh.freezeWorldMatrix()
+    }
+
+    // move the toolpath with the part the print sits on
+    private follow() {
+        const matrix = this.workpieceMatrix()
+        const node = this.workpieceNode(!!matrix)
+        if (!node) return
+        node.freezeWorldMatrix(matrix ?? Matrix.Identity())
+        for (const mesh of this.scene.meshes) this.attach(mesh)
+        for (const child of node.getChildren()) {
+            if (child instanceof TransformNode && child.isWorldMatrixFrozen) child.freezeWorldMatrix()
+        }
     }
 
     // scene transform of the part the print sits on (the [model] workpiece),
@@ -347,6 +402,8 @@ export class PrinterModel {
     }
 
     dispose() {
+        this.scene.onNewMeshAddedObservable.remove(this.meshAdded)
+        this.meshAdded = null
         for (const p of this.parts) for (const m of p.meshes) m.dispose(false, true)
         this.parts = []
     }
