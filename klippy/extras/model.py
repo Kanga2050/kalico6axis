@@ -11,13 +11,7 @@ import math
 import os
 import re
 
-JOINTS = {
-    "fixed": "fixed",
-    "linear": "linear",
-    "prismatic": "linear",
-    "rotary": "rotary",
-    "revolute": "rotary",
-}
+JOINTS = ("fixed", "linear", "rotary")
 SHORT_SOURCES = (
     "x", "y", "z", "e", "a", "b", "c",
     "machine_x", "machine_y", "machine_z",
@@ -75,6 +69,7 @@ class Model:
         self.offset = config.getfloatlist("offset", (0.0, 0.0, 0.0), count=3)
         self.workpiece = config.get("workpiece", None)
         self.parts = {}
+        self.order = []
         self.printer.register_event_handler("klippy:connect", self._check)
 
     def add_part(self, part):
@@ -109,14 +104,13 @@ class Model:
             )
 
     def get_status(self, eventtime):
-        order = getattr(self, "order", None) or self._ordered()
         return {
             "up_axis": self.up_axis,
             "unit_scale": self.unit_scale,
             "offset": list(self.offset),
             "workpiece": self.workpiece,
             "root": dict(self.root),
-            "parts": [dict(p) for p in order],
+            "parts": [dict(p) for p in self.order],
         }
 
 
@@ -125,7 +119,7 @@ class ModelPart:
         printer = config.get_printer()
         model = printer.load_object(config, "model")
         name = config.get_name().split(None, 1)[1]
-        joint = config.getchoice("joint", JOINTS, "fixed")
+        joint = config.getchoice("joint", {j: j for j in JOINTS}, "fixed")
         part = {
             "name": name,
             "file": _file(config, printer),
