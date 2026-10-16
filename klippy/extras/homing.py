@@ -215,9 +215,17 @@ class HomingMove:
     def check_no_movement(self):
         if self.printer.get_start_args().get("debuginput") is not None:
             return None
+        # An endstop can stop motors that this move leaves still (on
+        # rotary-table kinematics the probe also stops the X/Y motors), so
+        # only fail when none of an endstop's motors moved
+        moved = {}
         for sp in self.stepper_positions:
-            if sp.start_pos == sp.trig_pos:
-                return sp.endstop_name
+            moved[sp.endstop_name] = moved.get(sp.endstop_name, False) or (
+                sp.start_pos != sp.trig_pos
+            )
+        for name, did_move in moved.items():
+            if not did_move:
+                return name
         return None
 
     def moved_less_than_dist(self, min_dist, homing_axes):

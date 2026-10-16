@@ -145,6 +145,16 @@ class GCodeMove:
             "homing_origin": self.Coord(*self.homing_position[:4]),
             "position": self.Coord(*self.last_position[:4]),
             "gcode_position": self.Coord(*move_position[:4]),
+            "extra_axes": {
+                a: self.last_position[i]
+                for a, i in self.axis_map.items()
+                if i > 3 and i < len(self.last_position)
+            },
+            "gcode_extra_axes": {
+                a: move_position[i]
+                for a, i in self.axis_map.items()
+                if i > 3 and i < len(move_position)
+            },
         }
 
     def reset_last_position(self):
