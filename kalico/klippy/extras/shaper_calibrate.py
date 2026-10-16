@@ -217,6 +217,13 @@ def estimate_smoother(np, smoother, test_damping_ratio, test_freqs):
     return res
 
 
+def _freq_option(shaper_name):
+    # Input smoothers are configured with smoother_freq_<axis>, while
+    # regular input shapers use shaper_freq_<axis>
+    smoothers = [s.name for s in shaper_defs.INPUT_SMOOTHERS]
+    return "smoother_freq" if shaper_name in smoothers else "shaper_freq"
+
+
 class ShaperCalibrate:
     def __init__(self, printer):
         self.printer = printer
@@ -651,7 +658,9 @@ class ShaperCalibrate:
         else:
             configfile.set("input_shaper", "shaper_type_" + axis, shaper_name)
             configfile.set(
-                "input_shaper", "shaper_freq_" + axis, "%.1f" % (shaper_freq,)
+                "input_shaper",
+                _freq_option(shaper_name) + "_" + axis,
+                "%.1f" % (shaper_freq,),
             )
 
     def apply_params(self, input_shaper, axis, shaper_name, shaper_freq):
@@ -667,7 +676,7 @@ class ShaperCalibrate:
                 "SET_INPUT_SHAPER",
                 {
                     "SHAPER_TYPE_" + axis: shaper_name,
-                    "SHAPER_FREQ_" + axis: shaper_freq,
+                    _freq_option(shaper_name).upper() + "_" + axis: shaper_freq,
                 },
             )
         )
