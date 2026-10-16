@@ -11,6 +11,7 @@ Everything that runs my 5-axis printer (a Voron 2.4 350 with an A/C trunnion bed
 | `config/` | My printer config, with `printer/model.cfg` and the coloured CAD parts in `models/` | – |
 | `twin/` | The digital twin: the whole stack running on a PC with simulated MCUs | – |
 | `install/` | `publish.sh`, which builds the branches and release printers install | – |
+| `slicer/` | `slice5.py`, a 5-axis test slicer for the A/C trunnion | – |
 
 ## 3D model of the printer
 
@@ -50,7 +51,7 @@ All options:
 | | `workpiece` | none | Part the print sits on; the G-code viewer's toolpath moves with it |
 | `[model_part name]` | `file` | required | 3D file for this part |
 | | `parent` | root | Part this one rides on |
-| | `joint` | `fixed` | `fixed`, `linear` (`prismatic`) or `rotary` (`revolute`) |
+| | `joint` | `fixed` | `fixed`, `linear` or `rotary` |
 | | `axis` | required if moving | Direction of travel, or axis of rotation |
 | | `origin` | `0, 0, 0` | A point on the rotation axis (rotary only) |
 | | `source` | required if moving | One of the sources below |
@@ -104,6 +105,16 @@ Kalico only homes with every rotary axis at 0. If the motors were turned off wit
 
 Limits: there are no real sensor readings, so endstops and probes trigger at the same spot every time, temperatures follow a simple model, and accelerometer data is flat.
 
+## 5-axis test slicer
+
+`slicer/slice5.py` slices a cube for the trunnion. Layers stay flat; along every wall the table tilts so the nozzle leans toward the wall's outside, so A holds the tilt and C turns a full circle each wall loop (alternate loops turn back, so C never winds up). G-code X Y Z are part coordinates and `corexy_ac` moves the table and gantry to match.
+
+```
+python slicer/slice5.py cube5.gcode --size 20 --tilt 20 --layer 0.3
+```
+
+It writes the object outline for adaptive meshing and the layer count, so Mainsail shows layer progress. Tested on the twin: a 20 mm cube at 20° (67 layers) prints through `PRINT_START` to `PRINT_END`, the motors' positions match the kinematics to under 0.01 mm, and the G-code viewer and 3D Printer panel show the table tilting and turning under the toolpath.
+
 ## Tests
 
 ```
@@ -116,7 +127,7 @@ The Mainsail tests check the browser's machine-position maths against Kalico's `
 ## Firmware additions (`kalico/`)
 
 - `[model]` / `[model_part]` (`klippy/extras/model.py`).
-- `motion_report` reports `live_steppers` (each motor's position from its step history) and, from those, `live_machine_position` and `live_rotary_position`. It also reports `live_pose` (the G-code X Y Z A B C), with a `motion_report/dump_trapq_pose` endpoint.
+- `motion_report` reports `live_steppers` (each motor's position from its step history) and, from those, `live_machine_position` and `live_rotary_position`. It also reports `live_pose` (the G-code X Y Z A B C).
 - `corexy_ac` reports `machine_position` and the rotary pivots and limits; `gcode_move` reports `extra_axes`.
 - `temperature_host` can read a stand-in file in the twin.
 - Fixes for `corexy_ac`: quad gantry level and Z tilt use only the Z motors (the X/Y motors also follow Z once the table tilts), and a probe no longer reports "triggered prior to movement" because the X/Y motors it also stops stayed still.

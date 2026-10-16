@@ -139,11 +139,12 @@ export function readSource(source: string, printer: unknown, sim?: number[] | nu
         return num(dig(printer, 'motion_report', 'live_position', 3)) ?? num(dig(printer, 'toolhead', 'position', 3))
     if (source in ROTARY) {
         if (sim) return sim[ROTARY[source]] ?? 0
-        const motor = num(dig(printer, 'motion_report', 'live_rotary_position', source))
-        if (motor !== null) return motor
-        const pose = dig(printer, 'motion_report', 'live_pose')
-        if (Array.isArray(pose) && pose.some((v) => v)) return num(pose[ROTARY[source]])
-        return num(dig(printer, 'toolhead', 'extra_axes', source.toUpperCase())) ?? 0
+        return (
+            num(dig(printer, 'motion_report', 'live_rotary_position', source)) ??
+            num(dig(printer, 'motion_report', 'live_pose', ROTARY[source])) ??
+            num(dig(printer, 'toolhead', 'extra_axes', source.toUpperCase())) ??
+            0
+        )
     }
     const [obj, path] = source.split(':')
     return num(dig(printer, obj, ...(path ?? '').split('.').map((k) => (/^\d+$/.test(k) ? Number(k) : k))))
@@ -300,15 +301,26 @@ export class PrinterModel {
             const sceneMatrix = Qi.multiply(part.world).multiply(Q)
             for (const m of part.meshes) m.freezeWorldMatrix(sceneMatrix)
         }
+        // with a moving table, the model's table and toolhead take the place of the
+        // gcodeviewer's flat bed and tool cursor
+        let moving = false
+        for (let p: Part | null | undefined = this.workpiece(); p && !moving; p = p.parent) moving = !!p.cfg.joint && p.cfg.joint !== 'fixed'
+        for (const name of ['BuildPlate', 'JRNozzle']) {
+            const mesh = this.scene.getMeshByName(name)
+            if (mesh) mesh.isVisible = !moving
+        }
     }
 
     // scene transform of the part the print sits on (the [model] workpiece),
     // so the toolpath can move with it; null when there is none
     workpieceMatrix(): Matrix | null {
+        const part = this.workpiece()
+        return part ? Q.clone().invert().multiply(part.world).multiply(Q) : null
+    }
+
+    private workpiece(): Part | undefined {
         const name = this.config?.workpiece
-        const part = name ? this.parts.find((p) => p.cfg.name === name) : undefined
-        if (!part) return null
-        return Q.clone().invert().multiply(part.world).multiply(Q)
+        return name ? this.parts.find((p) => p.cfg.name === name) : undefined
     }
 
     // point the viewer's orbit camera at the whole machine

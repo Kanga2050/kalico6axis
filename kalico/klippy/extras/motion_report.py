@@ -121,25 +121,6 @@ class DumpTrapQ:
         self.batch_bulk.add_mux_endpoint(
             "motion_report/dump_trapq", "name", name, api_resp
         )
-        self.last_pose_msg = (0.0, 0.0)
-        self.pose_bulk = bulk_sensor.BatchBulkHelper(
-            printer, self._process_pose_batch
-        )
-        self.pose_bulk.add_mux_endpoint(
-            "motion_report/dump_trapq_pose",
-            "name",
-            name,
-            {
-                "header": (
-                    "time",
-                    "duration",
-                    "start_velocity",
-                    "acceleration",
-                    "start_pose",
-                    "direction",
-                )
-            },
-        )
 
     def extract_trapq(self, start_time, end_time=NEVER_TIME):
         ffi_main, ffi_lib = chelper.get_ffi()
@@ -236,28 +217,6 @@ class DumpTrapQ:
         if not d:
             return {}
         self.last_batch_msg = d[-1]
-        return {"data": d}
-
-
-    def _process_pose_batch(self, eventtime):
-        qtime = self.last_pose_msg[0] + min(self.last_pose_msg[1], 0.100)
-        data, cdata = self.extract_trapq(qtime)
-        d = [
-            (
-                m.print_time,
-                m.move_t,
-                m.start_v,
-                m.accel,
-                (m.start_x, m.start_y, m.start_z, m.start_a, m.start_b, m.start_c),
-                (m.x_r, m.y_r, m.z_r, m.a_r, m.b_r, m.c_r),
-            )
-            for m in data
-        ]
-        if d and d[0][:2] == self.last_pose_msg:
-            d.pop(0)
-        if not d:
-            return {}
-        self.last_pose_msg = d[-1][:2]
         return {"data": d}
 
 

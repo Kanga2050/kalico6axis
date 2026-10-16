@@ -1,6 +1,5 @@
 <template>
     <panel
-        v-if="socketIsConnected"
         :icon="mdiPrinter3d"
         :title="$t('Panels.PrinterModelPanel.Headline')"
         :collapsible="true"
@@ -96,6 +95,8 @@ export default class PrinterModelPanel extends Mixins(BaseMixin) {
         gl.viewer.bed.buildBed()
         gl.viewer.resize()
         await this.loadModel()
+        // the panel may have been closed while the model loaded
+        if (!this.container) return
         this.move()
         this.resizeObserver = new ResizeObserver(() => gl.viewer?.resize())
         this.resizeObserver.observe(this.container)
