@@ -157,6 +157,9 @@ interface Part {
 }
 
 export class PrinterModel {
+    // model files being imported; their meshes must not be taken for toolpath meshes
+    static importing = 0
+
     scene: Scene
     config: ModelConfig | null = null
     parts: Part[] = []
@@ -213,15 +216,20 @@ export class PrinterModel {
         const root = `${this.baseUrl}/${file.slice(0, slash + 1)}`
         const name = file.slice(slash + 1)
         let result
+        PrinterModel.importing++
         try {
             result = await SceneLoader.ImportMeshAsync('', root, name, this.scene, null, '.' + ext)
         } catch (e) {
             window.console.warn(`model: could not load ${file}`, e)
             return
+        } finally {
+            PrinterModel.importing--
         }
         const toScene = this.fileToMachine(ext).multiply(Q)
-        // parents first, so every world matrix includes the loader's root and node transforms
         const nodes = [...result.meshes, ...result.transformNodes]
+        // only the file's own transforms count; drop any parent the scene gave these nodes meanwhile
+        for (const n of nodes) if (n.parent && !nodes.includes(n.parent as AbstractMesh)) n.parent = null
+        // parents first, so every world matrix includes the loader's root and node transforms
         const depth = (n: { parent: unknown }) => {
             let d = 0
             for (let p = n.parent as { parent: unknown } | null; p; p = p.parent as { parent: unknown } | null) d++
@@ -257,6 +265,7 @@ export class PrinterModel {
             m.material = mat
             m.isPickable = false
             m.alwaysSelectAsActiveMesh = true
+            m.metadata = { ...(m.metadata ?? {}), printerModel: true }
             part.meshes.push(m)
         }
         for (const m of result.meshes) if (!part.meshes.includes(m)) m.dispose()
