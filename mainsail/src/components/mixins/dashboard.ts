@@ -14,6 +14,7 @@ import {
     mdiPrinter3dNozzle,
     mdiThermometerLines,
     mdiWebcam,
+    mdiPrinter3d,
     mdiAdjust,
     mdiMulticast,
 } from '@mdi/js'
@@ -55,6 +56,8 @@ export default class DashboardMixin extends BaseMixin {
         switch (name) {
             case 'webcam':
                 return mdiWebcam
+            case 'printer-model':
+                return mdiPrinter3d
             case 'zoffset':
                 return mdiArrowCollapseVertical
             case 'toolhead-control':

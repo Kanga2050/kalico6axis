@@ -279,6 +279,7 @@ import {
     mdiSelectionRemove,
 } from '@mdi/js'
 import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog.vue'
+import { PrinterModel, ModelConfig, ToolPosition, readSource } from '@/components/gcodeviewer/printerModel'
 import { Debounce } from 'vue-debounce-decorator'
 
 interface downloadSnackbar {
@@ -301,6 +302,9 @@ interface ViewerObjectMetadata {
 }
 
 let viewer: GCodeViewerInstance | null = null
+let printerModel: PrinterModel | null = null
+let printerModelSeq = 0
+let printerModelFitted = false
 @Component({
     components: { ConfirmationDialog, Panel, CodeStream },
 })
@@ -524,6 +528,7 @@ export default class Viewer extends Mixins(BaseMixin) {
         viewer.gcodeProcessor.setLiveTracking(false)
         viewer.gcodeProcessor.g1AsExtrusion = this.cncMode
         viewer.buildObjects.objectCallback = this.objectCallback
+        this.hookPrinterModel()
 
         this.loadToolColors(this.extruderColors)
 
@@ -1154,6 +1159,73 @@ export default class Viewer extends Mixins(BaseMixin) {
 
         this.scrubPosition = this.scrubFileSize
         viewer.gcodeProcessor.updateFilePosition(this.scrubPosition)
+    }
+
+    get modelConfig(): ModelConfig | null {
+        return this.$store.state.printer.model ?? null
+    }
+
+    @Watch('modelConfig')
+    modelConfigChanged(newVal: ModelConfig | null, oldVal: ModelConfig | null) {
+        if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) this.loadPrinterModel()
+    }
+
+    hookPrinterModel() {
+        if (viewer === null) return
+        const v = viewer
+        const updateToolPosition = v.updateToolPosition.bind(v)
+        v.updateToolPosition = (position: ToolPosition) => {
+            updateToolPosition(position)
+            this.movePrinterModel(position)
+        }
+        const clearScene = v.clearScene.bind(v)
+        v.clearScene = (clearFile?: boolean) => {
+            clearScene(clearFile)
+            if (printerModel) printerModel.parts = []
+            this.loadPrinterModel()
+        }
+        this.loadPrinterModel()
+    }
+
+    async loadPrinterModel() {
+        if (viewer === null || !viewer.scene) return
+        if (printerModel) printerModel.dispose()
+        printerModel = null
+        if (!this.modelConfig) return
+        const seq = ++printerModelSeq
+        const model = new PrinterModel(viewer.scene, this.apiUrl + '/server/files/config')
+        await model.load(this.modelConfig)
+        if (seq !== printerModelSeq) {
+            model.dispose()
+            return
+        }
+        const firstLoad = printerModel === null && !printerModelFitted
+        printerModel = model
+        this.movePrinterModel(null)
+        if (firstLoad) {
+            model.fitCamera()
+            printerModelFitted = true
+        }
+        viewer.scene.executeWhenReady(() => viewer?.scene.render())
+    }
+
+    movePrinterModel(position: ToolPosition | null) {
+        if (printerModel === null) return
+        let sim: number[] | null = null
+        if (position && 'x' in position) sim = [position.x, position.z, position.y]
+        else if (Array.isArray(position)) {
+            sim = [0, 0, 0]
+            for (const p of position) sim['XYZ'.indexOf(p.axes)] = p.position
+            sim = sim.map((v, i) => v + (this.gcodeOffset[i] ?? 0))
+        }
+        const printer = this.$store.state.printer
+        const values: Record<string, number> = {}
+        for (const src of printerModel.sources()) {
+            const v = readSource(src, printer, sim)
+            if (v !== null) values[src] = v
+        }
+        printerModel.update(values)
+        viewer?.scene?.render()
     }
 
     objectCallback(metadata: ViewerObjectMetadata | null) {

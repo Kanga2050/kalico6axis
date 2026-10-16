@@ -1,0 +1,7 @@
+**/node_modules
+**/.git
+mainsail/src
+mainsail/dist
+kalico/out
+kalico/docs
+config
