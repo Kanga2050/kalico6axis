@@ -19,8 +19,8 @@ export default function buildReleaseInfo(): PluginOption {
                 )
                 await releaseInfoFile.writeFile(
                     JSON.stringify({
-                        project_name: 'mainsail',
-                        project_owner: 'mainsail-crew',
+                        project_name: 'kalico6axis',
+                        project_owner: 'Kanga2050',
                         version: `v${versionIdentifier}`,
                     })
                 )
