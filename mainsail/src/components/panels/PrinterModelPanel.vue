@@ -19,6 +19,8 @@ import GCodeViewer from '@sindarius/gcodeviewer'
 import type { GCodeViewerInstance } from '@/store/gcodeviewer/types'
 import { PrinterModel, ModelConfig, readSource } from '@/components/gcodeviewer/printerModel'
 import { mdiPrinter3d } from '@mdi/js'
+import axios from 'axios'
+import { escapePath } from '@/plugins/helpers'
 
 // One viewer for the life of the page, like the G-code viewer's: a Babylon
 // engine that is disposed and created again breaks the gcodeviewer's shared
@@ -29,6 +31,7 @@ const gl = Object.seal({
     viewer: null as GCodeViewerInstance | null,
     model: null as PrinterModel | null,
     key: '',
+    file: '',
 })
 
 @Component({ components: { Panel } })
@@ -65,6 +68,16 @@ export default class PrinterModelPanel extends Mixins(BaseMixin) {
         return this.$store.state.printer.toolhead?.axis_maximum ?? null
     }
 
+    // the file being printed, shown on the bed as it prints
+    get printFile(): string {
+        const ps = this.$store.state.printer.print_stats
+        return ['printing', 'paused', 'complete'].includes(ps?.state) ? (ps.filename ?? '') : ''
+    }
+
+    get filePosition(): number {
+        return this.$store.state.printer.virtual_sdcard?.file_position ?? 0
+    }
+
     get liveValues() {
         const printer = this.$store.state.printer
         return [
@@ -87,6 +100,7 @@ export default class PrinterModelPanel extends Mixins(BaseMixin) {
             gl.viewer = viewer
             viewer.setCursorVisiblity(false)
             viewer.setZClipPlane(1000000, -1000000)
+            PrinterModel.keepThroughClear(viewer, () => gl.model)
         }
         gl.viewer.setBackgroundColor(this.backgroundColor)
         gl.viewer.bed.setBedColor(this.gridColor)
@@ -98,6 +112,7 @@ export default class PrinterModelPanel extends Mixins(BaseMixin) {
         // the panel may have been closed while the model loaded
         if (!this.container) return
         this.move()
+        this.loadPrint()
         this.resizeObserver = new ResizeObserver(() => gl.viewer?.resize())
         this.resizeObserver.observe(this.container)
     }
@@ -153,6 +168,37 @@ export default class PrinterModelPanel extends Mixins(BaseMixin) {
             this.gl.model.update(values)
             this.gl.viewer?.scene?.render()
         })
+    }
+
+    @Watch('printFile')
+    async loadPrint() {
+        const viewer = this.gl.viewer
+        const file = this.printFile
+        if (!viewer || file === this.gl.file) return
+        this.gl.file = file
+        const text: string = file
+            ? await axios
+                  .get(this.apiUrl + '/server/files/gcodes/' + escapePath(file), { responseType: 'text' })
+                  .then((res) => res.data)
+                  .catch(() => '')
+            : ''
+        if (file !== this.gl.file) return
+        if (!text) {
+            viewer.clearScene(true)
+            return
+        }
+        await viewer.processFile(text)
+        this.showProgress()
+    }
+
+    // like the G-code viewer's tracking: the file up to where the printer is
+    @Watch('filePosition')
+    showProgress() {
+        const viewer = this.gl.viewer
+        if (!viewer || !this.gl.file) return
+        const done = this.$store.state.printer.print_stats?.state === 'complete'
+        viewer.gcodeProcessor.updateFilePosition(done ? viewer.fileSize : Math.max(0, this.filePosition - 350))
+        viewer.scene?.render()
     }
 
     @Watch('backgroundColor')

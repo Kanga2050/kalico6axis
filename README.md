@@ -75,7 +75,7 @@ Moving parts should use `machine_*` and `a`/`b`/`c`: a G-code move or a rotation
 Files must be inside the config folder. Kalico checks the tree and publishes it as the `model` printer object; Mainsail loads the files from the config folder and moves the parts in the browser:
 
 - **G-code viewer:** the whole printer animates along with the toolpath while scrubbing, simulating or tracking a print.
-- **Dashboard:** a 3D Printer panel, placed below the console, follows the live printer.
+- **Dashboard:** a 3D Printer panel, placed below the console, follows the live printer and shows the file being printed on the bed, up to where the printer is.
 - **Toolhead panel:** a jog row for each rotary axis the kinematics has (A and C here), below X, Y and Z. The middle button returns the axis to 0.
 
 Both use the G-code viewer's own scene, so they look the same as the original viewer.
