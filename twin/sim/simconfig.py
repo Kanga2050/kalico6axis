@@ -169,9 +169,7 @@ class SimConfig:
         self.last = None
         for name, opts in self.cfg.items():
             kind = name.split()[0]
-            if "heater_pin" in opts and kind in ("extruder", "heater_bed", "heater_generic") or name.startswith("extruder"):
-                if "heater_pin" not in opts:
-                    continue
+            if "heater_pin" in opts and (kind in ("heater_bed", "heater_generic") or kind.startswith("extruder")):
                 h = Heater("extruder" if kind.startswith("extruder") else kind, opts)
                 self.heaters[name] = h
                 pin = self.local_pin(opts["heater_pin"])
@@ -266,8 +264,8 @@ class SimConfig:
         temp = heater.temp if heater else (40.0 if isinstance(model, McuTemp) else AMBIENT)
         return model.fraction(temp)
 
-    def uart_driver(self, mcu, oid_pin, addr):
-        return self.uart_kinds.get(oid_pin, "2209")
+    def uart_driver(self, pin):
+        return self.uart_kinds.get(pin, "2209")
 
-    def spi_device(self, mcu, pin):
+    def spi_device(self, pin):
         return self.spi_kinds.get(pin, "5160")

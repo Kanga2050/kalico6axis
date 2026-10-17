@@ -8,7 +8,7 @@
                         :key="axis + '-' + steps"
                         :disabled="disabled"
                         class="btnMinWidthAuto col btnGroup"
-                        @click="doJog(axis, -steps)">
+                        @click="doRotaryMove(axis, -steps, false)">
                         <span class="body-2">–{{ steps }}°</span>
                     </v-btn>
                     <v-btn
@@ -16,7 +16,7 @@
                         color="primary"
                         class="font-weight-bold btnHomeAxis btnGroup"
                         :title="axis + ' to 0°'"
-                        @click="doZero(axis)">
+                        @click="doRotaryMove(axis, 0, true)">
                         {{ axis }}
                     </v-btn>
                     <v-btn
@@ -24,7 +24,7 @@
                         :key="axis + '+' + steps"
                         :disabled="disabled"
                         class="btnMinWidthAuto col btnGroup"
-                        @click="doJog(axis, steps)">
+                        @click="doRotaryMove(axis, steps, false)">
                         <span class="body-2">+{{ steps }}°</span>
                     </v-btn>
                 </v-item-group>
@@ -44,13 +44,6 @@ import ControlMixin from '@/components/mixins/control'
 export default class RotaryControl extends Mixins(BaseMixin, ControlMixin) {
     steps = [1, 15, 90]
 
-    get rotaryAxes(): string[] {
-        const extra = this.$store.state.printer.toolhead?.extra_axes ?? {}
-        return Object.keys(extra)
-            .filter((a) => ['A', 'B', 'C'].includes(a))
-            .sort()
-    }
-
     get disabled(): boolean {
         const homed = this.$store.state.printer.toolhead?.homed_axes ?? ''
         return ['printing'].includes(this.printer_state) || !homed.includes('xyz')
@@ -62,24 +55,6 @@ export default class RotaryControl extends Mixins(BaseMixin, ControlMixin) {
 
     get stepsSortedReverse() {
         return [...this.steps].sort((a, b) => a - b)
-    }
-
-    // plain G-code: the stock _CLIENT_LINEAR_MOVE macro only passes on X, Y, Z and E
-    move(axis: string, value: string, absolute: boolean) {
-        this.doSend(
-            `SAVE_GCODE_STATE NAME=_ui_movement\n` +
-                `G9${absolute ? 0 : 1}\n` +
-                `G1 ${axis}${value} F${this.feedrateXY * 60}\n` +
-                `RESTORE_GCODE_STATE NAME=_ui_movement`
-        )
-    }
-
-    doJog(axis: string, steps: number) {
-        this.move(axis, String(steps), false)
-    }
-
-    doZero(axis: string) {
-        this.move(axis, '0', true)
     }
 }
 </script>

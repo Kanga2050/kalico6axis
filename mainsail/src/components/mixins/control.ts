@@ -199,4 +199,22 @@ export default class ControlMixin extends Vue {
         this.$store.dispatch('server/addEvent', { message: gcode, type: 'command' })
         this.$socket.emit('printer.gcode.script', { script: gcode })
     }
+
+    // rotary axes (A, B, C) the kinematics provides
+    get rotaryAxes(): string[] {
+        const extra = this.$store.state.printer.toolhead?.extra_axes ?? {}
+        return Object.keys(extra)
+            .filter((a) => ['A', 'B', 'C'].includes(a))
+            .sort()
+    }
+
+    // plain G-code: the stock _CLIENT_LINEAR_MOVE macro only passes on X, Y, Z and E
+    doRotaryMove(axis: string, value: string | number, absolute: boolean) {
+        this.doSend(
+            `SAVE_GCODE_STATE NAME=_ui_movement\n` +
+                `G9${absolute ? 0 : 1}\n` +
+                `G1 ${axis}${value} F${this.feedrateXY * 60}\n` +
+                `RESTORE_GCODE_STATE NAME=_ui_movement`
+        )
+    }
 }

@@ -6,8 +6,8 @@
 # would on the printer. Steppers, endstops, trsync, heaters, ADC, TMC UART
 # and SPI, PWM and neopixels are emulated; no physical sensors.
 #
-# usage: fakemcu.py --dict klipper.dict --link /dev/serial/by-id/... \
-#                   --name mcu --config printer.cfg [--sensors sensors.json]
+# usage: fakemcu.py --mcu name:klipper.dict:/dev/serial/by-id/... \
+#                   [--mcu ...] --config printer.cfg
 import argparse
 import bisect
 import heapq
@@ -101,13 +101,6 @@ class Stepper:
         self.base = self.position(clock)
         self.moves = []
         self.last = 0.0
-
-    def first_step_after(self, clock):
-        for m in self.moves:
-            t = m[0] + m[1]
-            if m[6] > clock:
-                return max(t, clock) if t < clock else t
-        return None
 
 
 class Trsync:
@@ -222,10 +215,8 @@ class FakeMCU:
         self.pwms = {}
         self.uarts = {}
         self.spis = {}
-        self.neopixels = set()
         self.timers = []
         self.timer_seq = 0
-        self.oid_pins = {}
 
     # clocks
     def now(self):
@@ -390,7 +381,6 @@ class FakeMCU:
     def cmd_trsync_start(self, oid, report_clock, report_ticks, expire_reason):
         ts = self.trsyncs.setdefault(oid, Trsync(oid))
         ts.active = True
-        ts.started = time.monotonic()
         ts.triggered_reason = 0
         ts.steppers = []
         ts.expire_clock = None
@@ -532,9 +522,6 @@ class FakeMCU:
                 if links and norm > 2:
                     REFS.setdefault(sig, []).append((sig, cur, direction))
         es["last_w"] = now_w
-        if now_w - es.get("dbg", 0) > 0.25:
-            es["dbg"] = now_w
-            logging.debug("%s poll es%d links=%d cur=%s", self.name, oid, len(links), cur)
         if trig_w is not None:
             logging.debug("%s endstop %d trigger", self.name, oid)
             trig = (trig_w - START) * self.freq
@@ -616,7 +603,7 @@ class FakeMCU:
         reply = b""
         if len(frames) >= 4:
             addr, reg = frames[1], frames[2]
-            chip = bus.setdefault(addr, TMC(self.sim.uart_driver(self.name, bus.get("pin"), addr)))
+            chip = bus.setdefault(addr, TMC(self.sim.uart_driver(bus.get("pin"))))
             if reg & 0x80 and len(frames) >= 8:
                 val = (frames[3] << 24) | (frames[4] << 16) | (frames[5] << 8) | frames[6]
                 chip.write(reg & 0x7F, val)
@@ -637,7 +624,7 @@ class FakeMCU:
     def spi_device(self, oid):
         s = self.spis.setdefault(oid, {"pin": None, "dev": None})
         if s["dev"] is None:
-            kind = self.sim.spi_device(self.name, s["pin"])
+            kind = self.sim.spi_device(s["pin"])
             s["dev"] = TMC(kind) if kind.isdigit() else {"kind": kind}
         return s["dev"]
 
@@ -675,7 +662,7 @@ class FakeMCU:
 
     # misc peripherals
     def cmd_config_neopixel(self, oid, pin, **kw):
-        self.neopixels.add(oid)
+        pass
 
     def cmd_neopixel_update(self, oid, pos, data):
         pass

@@ -1196,7 +1196,11 @@ export default class Viewer extends Mixins(BaseMixin) {
         }
         // toolpath meshes are created as the file renders; hang new ones on the workpiece
         v.scene.onNewMeshAddedObservable.add((mesh: AbstractMesh) => {
-            Promise.resolve().then(() => this.attachToWorkpiece(mesh))
+            Promise.resolve().then(() => {
+                this.attachToWorkpiece(mesh)
+                // a rebuilt bed starts visible; the model decides whether it shows
+                if (mesh.name === 'BuildPlate') printerModel?.update(printerModel.lastValues)
+            })
         })
         this.loadPrinterModel()
     }
@@ -1220,7 +1224,6 @@ export default class Viewer extends Mixins(BaseMixin) {
             workpieceNode = new TransformNode('workpiece', scene)
         workpieceNode.freezeWorldMatrix(matrix ?? Matrix.Identity())
         for (const mesh of scene.meshes) this.attachToWorkpiece(mesh)
-        for (const node of scene.transformNodes) if (node.name === 'toolCursorContainer') this.attachToWorkpiece(node)
         for (const child of workpieceNode.getChildren()) {
             if (child instanceof TransformNode && child.isWorldMatrixFrozen) child.freezeWorldMatrix()
         }
