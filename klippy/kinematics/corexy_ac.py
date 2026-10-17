@@ -128,9 +128,6 @@ class CoreXYACKinematics(corexy.CoreXYKinematics):
         }
         return [0.5 * (pos[0] + pos[1]), 0.5 * (pos[0] - pos[1]), pos[2]], rotary
 
-    def get_machine_position(self, pose):
-        return self._to_machine(pose)
-
     def get_status(self, eventtime):
         res = corexy.CoreXYKinematics.get_status(self, eventtime)
         pose = self.toolhead.get_pose()
