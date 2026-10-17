@@ -4,6 +4,11 @@
         :title="$t('Panels.PrinterModelPanel.Headline')"
         :collapsible="true"
         card-class="printer-model-panel">
+        <template #buttons>
+            <v-btn icon tile @click="fullscreen(container)">
+                <v-icon>{{ mdiFullscreen }}</v-icon>
+            </v-btn>
+        </template>
         <v-card-text class="pa-0">
             <div ref="container" class="printer-model-canvas" />
         </v-card-text>
@@ -18,7 +23,8 @@ import Panel from '@/components/ui/Panel.vue'
 import GCodeViewer from '@sindarius/gcodeviewer'
 import type { GCodeViewerInstance } from '@/store/gcodeviewer/types'
 import { PrinterModel, ModelConfig, readSource } from '@/components/gcodeviewer/printerModel'
-import { mdiPrinter3d } from '@mdi/js'
+import { mdiFullscreen, mdiPrinter3d } from '@mdi/js'
+import { addKeyboardMove, fullscreen } from '@/components/gcodeviewer/viewControls'
 import axios from 'axios'
 import { escapePath } from '@/plugins/helpers'
 
@@ -37,6 +43,8 @@ const gl = Object.seal({
 @Component({ components: { Panel } })
 export default class PrinterModelPanel extends Mixins(BaseMixin) {
     mdiPrinter3d = mdiPrinter3d
+    mdiFullscreen = mdiFullscreen
+    fullscreen = fullscreen
 
     @Ref() readonly container!: HTMLDivElement
 
@@ -101,6 +109,7 @@ export default class PrinterModelPanel extends Mixins(BaseMixin) {
             viewer.setCursorVisiblity(false)
             viewer.setZClipPlane(1000000, -1000000)
             PrinterModel.keepThroughClear(viewer, () => gl.model)
+            addKeyboardMove(viewer.scene)
         }
         gl.viewer.setBackgroundColor(this.backgroundColor)
         gl.viewer.bed.setBedColor(this.gridColor)
@@ -218,6 +227,11 @@ export default class PrinterModelPanel extends Mixins(BaseMixin) {
     position: relative;
     width: 100%;
     aspect-ratio: 4 / 3;
+}
+
+.printer-model-canvas:fullscreen {
+    aspect-ratio: auto;
+    height: 100vh;
 }
 
 .printer-model-canvas ::v-deep .viewer {
