@@ -16,11 +16,14 @@
                 <v-btn icon tile @click="resetCamera">
                     <v-icon>{{ mdiCameraRetake }}</v-icon>
                 </v-btn>
+                <v-btn icon tile @click="fullscreen(viewerCanvasContainer)">
+                    <v-icon>{{ mdiFullscreen }}</v-icon>
+                </v-btn>
             </template>
             <v-card-text>
                 <v-row :class="showScrubber ? 'withScrubber' : ''">
                     <v-col :cols="showGCode ? 8 : 12">
-                        <div ref="viewerCanvasContainer"></div>
+                        <div ref="viewerCanvasContainer" class="viewer-container"></div>
                     </v-col>
                     <v-col v-show="showGCode" cols="4">
                         <div class="viewer">
@@ -266,6 +269,7 @@ import CodeStream from '@/components/gcodeviewer/CodeStream.vue'
 import type { GCodeViewerInstance } from '@/store/gcodeviewer/types'
 import {
     mdiCameraRetake,
+    mdiFullscreen,
     mdiCog,
     mdiClose,
     mdiReloadAlert,
@@ -281,6 +285,7 @@ import {
 import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog.vue'
 import { PrinterModel, ModelConfig, ToolPosition, readSource } from '@/components/gcodeviewer/printerModel'
 import { indexRotary, rotaryAt, RotaryStep } from '@/components/gcodeviewer/rotaryIndex'
+import { addKeyboardMove, fullscreen } from '@/components/gcodeviewer/viewControls'
 import { Vector3 } from '@babylonjs/core/Maths/math.vector'
 import { Debounce } from 'vue-debounce-decorator'
 
@@ -318,6 +323,8 @@ export default class Viewer extends Mixins(BaseMixin) {
      */
     mdiReloadAlert = mdiReloadAlert
     mdiCameraRetake = mdiCameraRetake
+    mdiFullscreen = mdiFullscreen
+    fullscreen = fullscreen
     mdiToggleSwitch = mdiToggleSwitch
     mdiToggleSwitchOffOutline = mdiToggleSwitchOffOutline
     mdiClose = mdiClose
@@ -1183,6 +1190,7 @@ export default class Viewer extends Mixins(BaseMixin) {
             this.movePrinterModel(position)
         }
         PrinterModel.keepThroughClear(v, () => printerModel)
+        addKeyboardMove(v.scene)
         this.loadPrinterModel()
     }
 
@@ -1265,6 +1273,11 @@ export default class Viewer extends Mixins(BaseMixin) {
 
 <!-- Because the viewer lives outside of the components DOM it can't be scoped -->
 <style>
+.viewer-container:fullscreen .viewer {
+    height: 100vh;
+    border: 0;
+}
+
 .viewer {
     width: 100%;
     height: calc(var(--app-height) - 240px);
