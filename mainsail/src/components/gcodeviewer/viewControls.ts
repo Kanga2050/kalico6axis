@@ -1,8 +1,8 @@
 // Keyboard movement and fullscreen for the 3D views.
 //
 // W A S D move the view across the scene, Space up and Shift down, while the
-// canvas has focus (click it first). Speed follows the zoom: the camera moves
-// about its own distance from the target every 1.5 s.
+// canvas has focus (click it first). Speed follows the zoom: a quarter of the
+// camera's distance from the target per second, between 5 and 150 mm/s.
 import { Scene } from '@babylonjs/core/scene'
 import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera'
 import { Vector3 } from '@babylonjs/core/Maths/math.vector'
@@ -50,7 +50,8 @@ export function addKeyboardMove(scene: Scene) {
         if (held.has('down')) move.y -= 1
         if (move.lengthSquared() > 0) {
             // keep the angles and distance, so the whole view moves
-            camera.setTarget(camera.target.add(move.normalize().scale((camera.radius / 1.5) * dt)), false, false, true)
+            const speed = Math.min(150, Math.max(5, camera.radius * 0.25))
+            camera.setTarget(camera.target.add(move.normalize().scale(speed * dt)), false, false, true)
             scene.render()
         }
         frame = requestAnimationFrame(step)
