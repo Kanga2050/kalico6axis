@@ -127,7 +127,7 @@ The Mainsail tests check the browser's machine-position maths against Kalico's `
 ## Firmware additions (`kalico/`)
 
 - `[model]` / `[model_part]` (`klippy/extras/model.py`).
-- `[z_floor]` (`klippy/extras/z_floor.py`): once Z is homed, refuses any move that ends below `z`, except straight lifts. G28's own homing moves are exempt, so a Z endstop pin below the floor still homes; probing is not exempt.
+- `[z_floor]` (`klippy/extras/z_floor.py`): once Z is homed, refuses any move that ends below `z`, except straight lifts. G28's own homing moves are exempt, so a Z endstop pin below the floor still homes, and every G28 ends by lifting Z to `z + clearance` (default 10 mm); probing is not exempt.
 - `motion_report` reports `live_steppers` (each motor's position from its step history) and, from those, `live_machine_position` and `live_rotary_position`. It also reports `live_pose` (the G-code X Y Z A B C).
 - `corexy_ac` reports `machine_position` and the rotary pivots and limits; `gcode_move` reports `extra_axes`.
 - `temperature_host` can read a stand-in file in the twin.
