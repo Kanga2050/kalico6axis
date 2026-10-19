@@ -78,7 +78,7 @@ Files must be inside the config folder. Kalico checks the tree and publishes it 
 - **Dashboard:** a 3D Printer panel, placed below the console, follows the live printer and shows the file being printed on the bed, up to where the printer is.
 - **Toolhead panel:** a jog row for each rotary axis the kinematics has (A and C here), below X, Y and Z. The middle button returns the axis to 0.
 
-Both use the G-code viewer's own scene, so they look the same as the original viewer. In either view, click it and use W A S D to move across, Space and Shift to move up and down (faster when zoomed out); the fullscreen button fills the screen, and Esc leaves.
+Both use the G-code viewer's own scene, so they look the same as the original viewer. In either view, click it and use W A S D to move across, Space and Shift to move up and down (5 to 150 mm/s, faster when zoomed out); the fullscreen button fills the screen, and Esc leaves.
 
 ## Digital twin
 
