@@ -2,10 +2,13 @@
 #
 # [z_floor]
 # z: 12.5
+# clearance: 10    # G28 ends with Z lifted to z + clearance
+# lift_speed: 15
 #
 # After homing, any move that ends below z is refused, except straight lifts
 # (no X/Y travel, Z not going down). G28's own homing moves are exempt, so a
-# Z endstop below the floor still works. Probing moves are not exempt.
+# Z endstop below the floor still works, and every G28 finishes by lifting Z
+# above the floor. Probing moves are not exempt.
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
@@ -14,6 +17,8 @@ class ZFloor:
     def __init__(self, config):
         self.printer = config.get_printer()
         self.z = config.getfloat("z")
+        self.clearance = config.getfloat("clearance", 10.0, minval=0.0)
+        self.lift_speed = config.getfloat("lift_speed", 15.0, above=0.0)
         self.homing = False
         self.g28 = None
         self.printer.register_event_handler("klippy:connect", self._connect)
@@ -37,6 +42,11 @@ class ZFloor:
             self.g28(gcmd)
         finally:
             self.homing = False
+        toolhead = self.printer.lookup_object("toolhead")
+        low, high = toolhead.get_kinematics().limits[2]
+        top = min(self.z + self.clearance, high)
+        if low <= high and toolhead.get_position()[2] < top:
+            toolhead.manual_move([None, None, top], self.lift_speed)
 
     def _check(self, kin, move):
         low, high = kin.limits[2]
@@ -52,7 +62,7 @@ class ZFloor:
         )
 
     def get_status(self, eventtime):
-        return {"z": self.z}
+        return {"z": self.z, "clearance": self.clearance}
 
 
 def load_config(config):
