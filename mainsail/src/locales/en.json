@@ -302,6 +302,7 @@
         "ClearLoadedFile": "Clear",
         "CNCMode": "CNC Mode",
         "ColorMode": "Color Mode",
+        "DownloadFailed": "Could not download {filename}: {error}",
         "Downloading": "Downloading",
         "ForceLineRendering": "Force Line Rendering",
         "HDRendering": "HD Rendering (Round Extrusions)",
