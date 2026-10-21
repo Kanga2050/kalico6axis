@@ -120,17 +120,20 @@ It writes the object outline for adaptive meshing and the layer count, so Mainsa
 
 ## 5-axis slicer
 
-`slicer/split5.py` slices any closed STL for the trunnion. Instead of deforming the model, it splits it with plane cuts into chunks that each print without supports from their own build direction. The first chunk grows on the bed; every other chunk grows on a cut face of what was printed before it, with its layers parallel to that face, so the table tilts it to face the nozzle.
+`slicer/split5.py` slices any closed STL for the trunnion. Instead of deforming the model, it splits it with plane cuts into chunks that each print without supports from their own build direction. The first chunk grows on the bed; every other chunk grows on a cut face of what was printed before it, with its layers parallel to that face, so the table tilts it to face the nozzle. Where no cut can free an overhang, the slicer adds supports instead of printing in mid-air.
 
 ```
 python slicer/split5.py part.stl part.gcode
 python slicer/split5.py part.stl part.gcode --method overhang --lean 10 --layer 0.25
 ```
 
-- `--method overhang` cuts where overhangs meet the body, trying planes through each overhang's root at 30° to 90° from the current build direction. `--method convex` cuts between the parts of a convex decomposition (CoACD), using the plane of each contact patch and the same tilts. `--method hybrid` (default) plans with both and with a mix of the two candidates, each once preferring cuts that free the most at once and once preferring small cuts that free one feature, and keeps the plan with the least overhang left, then the fewest chunks.
+- What needs a cut is found layer by layer, the way the chunk will print: every part of a layer must sit within the overhang angle of the layer under it (or, for a chunk's first layer, of what is under its cut). This catches overhanging faces, islands that start in mid-air, V-shaped bottoms and bridges, and cuts are kept only if they lower it. A chunk that still can't print is cut again, with what was printed before it as its bed.
+- `--method overhang` cuts where overhangs meet the body, trying planes through each overhang's root at 30° to 90° from the current build direction. `--method convex` cuts between the parts of a convex decomposition (CoACD), using the plane of each contact patch and the same tilts. `--method hybrid` (default) plans with both and with a mix of the two candidates, each once preferring cuts that free the most at once and once preferring small cuts that free one feature, and keeps the plan with the least overhang left, then the fewest chunks. Islands also get cuts tilted toward every side of them, so a bridge can grow sideways off one of its pillars.
+- Chunks print in an order where each comes after everything it stands on, and among those, the one that leaves the toolhead the most room for the rest.
 - `--overhang` is the steepest overhang left uncut (default 50° from vertical), `--max-tilt` the largest chunk tilt (default 90°).
-- Inside a chunk the nozzle leans `--lean` degrees (default 15) toward each wall's outside and across infill lines, building up over `--ramp` mm from the chunk's base, so A and C move while printing. Wall loops pick the direction that turns C back toward 0, so C stays within about one turn.
+- Inside a chunk the nozzle leans `--lean` degrees (default 15) toward each wall's outside and across infill lines, building up over `--ramp` mm from the chunk's base, so A and C move while printing. Wall loops pick the direction that turns C back toward 0, and switching to the other A solution turns C back toward 0 as well, so C stays within about one turn.
 - Every pose is checked against the real toolhead and gantry beam from `config/models` (carriage and beam sampled into height columns; the beam only across the carriage's width, because the `beam` group in the CAD reaches 3 mm above the nozzle along its whole length, which would hit the trunnion's side holders below Z 29 and can't be the real beam) and against the platter, the tilt cradle, everything printed before and the layers already printed in the chunk. Where the lean would hit, it is reduced for that path, or the other A solution (−A with C + 180°) is used; chunk directions that hit even without lean are not used.
+- Overhang that no cut could free gets supports: 2 mm columns along the chunk's build direction under each spot that would be in mid-air, standing on the chunk itself, on what earlier chunks actually printed, or on the bed, with support-only layers below the chunk's cut where needed. `--no-supports` turns them off. Slivers too thin to print that nothing can hold up are left out, support lines the toolhead can't reach are skipped, and the slicer reports both. After writing, it checks the G-code for extrusion with nothing printed within 2 mm under it and warns if there is any.
 - Between chunks the nozzle retracts, rises above everything that will turn under the head, turns the table in 5° steps with the head held still, then comes down along the new tool axis. `BED_MESH_CLEAR` is sent before the first tilted chunk.
 
 Pivots, A limits and machine limits come from `config/printer/rotary.cfg` and the stepper configs. G-code X Y Z are part coordinates, as for `slice5.py`, and the output has the same `PRINT_START`, object and layer lines.
@@ -142,12 +145,14 @@ Pivots, A limits and machine limits come from `config/printer/rotary.cfg` and th
 | `tbracket` (post with a side arm) | 2: the post, then the arm on a 45° cut | 250 | 60° | 2.1 h |
 | `lbracket` (post with an arm toward the front) | 2: the post, then the arm on a 45° cut | 272 | 60° | 2.1 h |
 | `ybranch` (trunk with two arms 30° above horizontal) | 3: the trunk, then each arm on a 30° cut | 252 | 45° | 1.6 h |
-| `tallmushroom` (stem with a wide cap) | 2: the stem, then the cap on a 45° cut | 260 | 60° | 2.1 h |
-| `tree` (holed base, trunk, six arms around it at six heights, a shelf and a cap) | 4: the base and trunk, then three cuts tilted toward three sides | 428 | 60° | 4.9 h |
+| `tallmushroom` (stem with a wide cap) | 7: the stem, then the cap in pieces tilted toward its sides, so no piece starts from a point on the rim | 403 | 70° | 2.2 h |
+| `tree` (holed base, trunk, six arms around it at six heights, a shelf and a cap) | 9: the base and trunk, then arms, shelf and cap on cuts tilted toward each side, with a few supports | 809 | 86° | 5.8 h |
+| `arch` (two pillars and a bar) | 1, with supports under the bar | 126 | 15° | 1.2 h |
+| `mushroom` (short stem with a wide cap) | 1, with supports under the cap | 86 | 15° | 1.1 h |
 
-Each has no overhang left, the chunks add up to the model's volume, no pose hits the printer, and Kalico accepts the whole file with `twin.cfg` (from `PRINT_START` to `PRINT_END`, no refused moves). Load one in the twin's Mainsail to see the table tilt and turn under the toolpath.
+No pose hits the printer, the chunks add up to the model's volume, and Kalico accepts every file with `twin.cfg` (from `PRINT_START` to `PRINT_END`, no refused moves). Load one in the twin's Mainsail to see the table tilt and turn under the toolpath.
 
-`arch.stl` and `mushroom.stl` are test models without G-code, because the arch's bridge and the low mushroom's cap stay as overhangs (the slicer warns about them). A single cut can't free the bridge without lifting a pillar off the bed, and a 20 mm high cap is too close to the platter to tilt for, so the toolhead would hit the bed. The tall mushroom shows the same cap printed on a 45° cut once there is room.
+The arch and the low mushroom can't be freed by cuts: growing the arch's bar sideways off one pillar puts the head into the other pillar, and a 20 mm high cap is too close to the platter to tilt for, so both print upright with supports from the bed. In `tree` and `tallmushroom` a few supports sit where the toolhead can't reach and are left out, so the mid-air check still finds 35 mm and 0.8 mm of extrusion (out of 245 m and 75 m of lines) with nothing printed within 2 mm under it.
 
 ## Tests
 

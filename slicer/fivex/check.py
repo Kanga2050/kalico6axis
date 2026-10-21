@@ -44,3 +44,49 @@ def check(path, machine):
         "outside limits": int((~machine.in_limits(m)).sum()),
         "A outside limits": int(((poses[:, 3] < machine.a_min) | (poses[:, 3] > machine.a_max)).sum()),
     }
+
+
+def support(path, near=0.8, far=2.0, step=0.4):
+    from scipy.spatial import cKDTree
+    pos = {"A": 0.0, "C": 0.0}
+    layers, cur, last, bed = [], [], None, None
+    for line in open(path):
+        if line.startswith(";Z:") and bed is None:
+            bed = float(line[3:]) + 0.2
+        if line.startswith(";LAYER_CHANGE"):
+            if cur:
+                layers.append(np.vstack(cur))
+            cur = []
+            continue
+        if not line.startswith("G1 "):
+            continue
+        words = dict(WORD.findall(line))
+        e = float(words.pop("E", 0))
+        words.pop("F", None)
+        if not words:
+            continue
+        pos.update({k: float(v) for k, v in words.items()})
+        if len(pos) < 5:
+            continue
+        p = np.array([pos["X"], pos["Y"], pos["Z"]])
+        if e > 0 and last is not None:
+            n = max(1, int(np.ceil(np.linalg.norm(p - last) / step)))
+            cur.append(last + np.outer(np.arange(1, n + 1) / n, p - last))
+        last = p
+    if cur:
+        layers.append(np.vstack(cur))
+    old, recent, midair, steep, total = None, [], 0, 0, 0
+    for pts in layers:
+        dist = np.full(len(pts), np.inf)
+        for tree in (old, cKDTree(np.vstack(recent)) if recent else None):
+            if tree is not None:
+                dist = np.minimum(dist, tree.query(pts, distance_upper_bound=far + 1)[0])
+        dist[pts[:, 2] < (bed or 0.5)] = 0.0
+        midair += int((dist > far).sum())
+        steep += int(((dist > near) & (dist <= far)).sum())
+        total += len(pts)
+        recent.append(pts)
+        if len(recent) > 30:
+            old = cKDTree(np.vstack(([old.data] if old is not None else []) + recent))
+            recent = []
+    return {"points": total, "midair": midair, "steep": steep, "step": step}

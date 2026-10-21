@@ -25,12 +25,13 @@ class Obstacles:
         pts, heights = [sample(chunk.mesh, 1.4)], []
         heights.append((pts[0] - chunk.origin) @ chunk.d)
         for lay in layers:
-            if lay.region.is_empty:
+            solid = lay.region.union(lay.support)
+            if solid.is_empty:
                 continue
-            x0, y0, x1, y1 = lay.region.bounds
+            x0, y0, x1, y1 = solid.bounds
             gx, gy = np.meshgrid(np.arange(x0, x1, spacing), np.arange(y0, y1, spacing))
             grid = np.column_stack((gx.ravel(), gy.ravel()))
-            grid = grid[shapely.contains_xy(lay.region, grid[:, 0], grid[:, 1])]
+            grid = grid[shapely.contains_xy(solid, grid[:, 0], grid[:, 1])]
             if len(grid):
                 pts.append(chunk.origin + np.column_stack((grid, np.full(len(grid), lay.h))) @ rot)
                 heights.append(np.full(len(grid), lay.h))
@@ -67,6 +68,7 @@ class Writer:
         self.collisions = []
         self.reduced = 0
         self.flipped = 0
+        self.skipped = 0
         self.obstacles = Obstacles(machine)
         self.layer_no = 0
         self.memo = {}
@@ -131,7 +133,10 @@ class Writer:
         self.orient(path, d, lean)
         key = (id(chunk), path.layer, path.kind)
         scales = [s for s in (1.0, 0.66, 0.33, 0.0) if s <= self.memo.get(key, 1.0)]
-        for flip, prev in enumerate(((self.a, self.c), (-self.a, self.c + 180.0))):
+        if not path.lean_dirs.any():
+            scales = [0.0]
+        back = self.c + (180.0 if self.c < 0 else -180.0)
+        for flip, prev in enumerate(((self.a, self.c), (-self.a, back))):
             for scale in scales:
                 lam = math.radians(lean * scale)
                 tools = math.cos(lam) * d + math.sin(lam) * path.lean_dirs
@@ -144,7 +149,10 @@ class Writer:
                     self.flipped += flip
                     return tools, angles
         tools = np.tile(d, (len(path.pts), 1))
-        angles = self.solve(tools, (self.a, self.c)) or self.solve(tools, (-self.a, self.c + 180.0))
+        angles = self.solve(tools, (self.a, self.c)) or self.solve(tools, (-self.a, back))
+        if path.kind == "support":
+            self.skipped += 1
+            return None, None
         self.collisions.append((path.kind, path.layer, self.collides(path.pts, angles, h_local)))
         return tools, angles
 
@@ -228,6 +236,8 @@ class Writer:
 
     def run_path(self, path, chunk, h_local, first):
         tools, angles = self.fit(path, chunk, h_local)
+        if tools is None:
+            return first
         p0 = path.pts[0]
         if first:
             self.safe_move(p0, *angles[0])
@@ -238,6 +248,7 @@ class Writer:
         for i in range(1, len(path.pts)):
             dist = np.linalg.norm(path.pts[i] - path.pts[i - 1])
             self.emit(path.pts[i], *angles[i], e=self.e_for(dist, path), f=f if i == 1 else None)
+        return False
 
     def chunk(self, chunk, layers, rot, first_chunk):
         self.obstacles.start(chunk, layers, rot)
@@ -251,8 +262,7 @@ class Writer:
             self.out.append(";LAYER_CHANGE\n;Z:%.3f\nSET_PRINT_STATS_INFO CURRENT_LAYER=%d"
                             % (lay.h, self.layer_no))
             for path in lay.paths:
-                self.run_path(path, chunk, lay.h, first)
-                first = False
+                first = self.run_path(path, chunk, lay.h, first)
         self.obstacles.finish(chunk.mesh)
         self.obstacles.current = None
 
