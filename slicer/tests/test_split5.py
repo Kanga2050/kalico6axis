@@ -104,6 +104,15 @@ def test_decomposition_removes_overhangs(machine, models, name, chunks, method):
         assert c.mesh.is_winding_consistent
 
 
+def test_tree_needs_cuts_in_several_directions(machine, models):
+    mesh = models["tree"]
+    plan = Planner(machine, "hybrid").plan(mesh)
+    assert len(plan) >= 4
+    assert len({tuple(np.round(c.d, 2)) for c in plan}) >= 4
+    assert sum(c.mesh.volume for c in plan) == pytest.approx(mesh.volume, rel=1e-4)
+    assert sum(c.overhang for c in plan) < 0.01 * mesh.area
+
+
 def test_unsolvable_parts_are_left_whole(machine, models):
     for name in ("arch", "mushroom"):
         mesh = models[name]
