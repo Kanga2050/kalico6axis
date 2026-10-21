@@ -20,6 +20,14 @@ def rod(r, length, tilt, yaw, start):
     return cyl(r, length).rotate((0, tilt, 0)).rotate((0, 0, yaw)).translate(start)
 
 
+def tree():
+    m = box(56, 56, 6) - cyl(7, 6).translate((14, -14, 0)) - cyl(5, 6).translate((-15, 16, 0))
+    m += cyl(8, 92, 64) + box(14, 34, 9, y=-22, z=82) + cyl(17, 5, 64).translate((0, 0, 90))
+    for i in range(6):
+        m += rod(4.5, 28, 68, 60 * i + 15, (0, 0, 26 + 10 * i))
+    return m
+
+
 MODELS = {
     "tbracket": lambda: box(20, 20, 40) + box(20, 40, 10, y=30, z=30),
     "ybranch": lambda: cyl(6, 26) + rod(5, 30, 60, 0, (0, 0, 22)) + rod(5, 30, 60, 180, (0, 0, 22)),
@@ -27,6 +35,7 @@ MODELS = {
     "tallmushroom": lambda: cyl(7, 62) + cyl(18, 6).translate((0, 0, 60)),
     "arch": lambda: box(12, 16, 30, x=-24) + box(12, 16, 30, x=24) + box(60, 16, 8, z=30),
     "lbracket": lambda: box(16, 16, 45) + box(16, 40, 12, y=-28, z=33),
+    "tree": tree,
 }
 
 

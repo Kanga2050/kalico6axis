@@ -139,8 +139,9 @@ class Head:
 
         car = sample(load("carriage"), spacing) - tip
         car = car[(car[:, 2] > 1.2) & (np.abs(car[:, :2]) < reach).all(1) & (car[:, 2] < reach)]
-        beam = sample(load("beam"), spacing)[:, 1:] - tip[1:]
-        beam = beam[(np.abs(beam[:, 0]) < reach) & (beam[:, 1] < reach)]
+        beam = sample(load("beam"), spacing) - tip
+        width = np.abs(car[:, 0]).max()
+        beam = beam[(np.abs(beam[:, 0]) < width) & (np.abs(beam[:, 1]) < reach) & (beam[:, 2] < reach)][:, 1:]
         xs = np.arange(-reach, reach + pitch, pitch)
         ys = np.arange(min(car[:, 1].min(), beam[:, 0].min()) - pitch,
                        max(car[:, 1].max(), beam[:, 0].max()) + pitch, pitch)
@@ -155,8 +156,9 @@ class Head:
         bhi = np.full(len(ys), -np.inf)
         np.minimum.at(blo, by, beam[:, 1])
         np.maximum.at(bhi, by, beam[:, 1])
-        self.lo = np.minimum(self.lo, blo[None, :])
-        self.hi = np.maximum(self.hi, bhi[None, :])
+        under = (np.abs(xs) <= width)[:, None]
+        self.lo = np.where(under, np.minimum(self.lo, blo[None, :]), self.lo)
+        self.hi = np.where(under, np.maximum(self.hi, bhi[None, :]), self.hi)
         self.origin, self.pitch = np.array([xs[0], ys[0]]), pitch
         gx, gy = np.meshgrid(xs, ys, indexing="ij")
         cells = np.isfinite(self.lo) & (gx % 2 < pitch) & (gy % 2 < pitch)

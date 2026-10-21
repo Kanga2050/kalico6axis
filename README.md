@@ -127,10 +127,10 @@ python slicer/split5.py part.stl part.gcode
 python slicer/split5.py part.stl part.gcode --method overhang --lean 10 --layer 0.25
 ```
 
-- `--method overhang` cuts where overhangs meet the body, trying planes through each overhang's root at 30° to 90° from the current build direction. `--method convex` cuts between the parts of a convex decomposition (CoACD), using the plane of each contact patch and the same tilts. `--method hybrid` (default) plans with both and with a mix of the two candidates, and keeps the plan with the least overhang left, then the fewest chunks.
+- `--method overhang` cuts where overhangs meet the body, trying planes through each overhang's root at 30° to 90° from the current build direction. `--method convex` cuts between the parts of a convex decomposition (CoACD), using the plane of each contact patch and the same tilts. `--method hybrid` (default) plans with both and with a mix of the two candidates, each once preferring cuts that free the most at once and once preferring small cuts that free one feature, and keeps the plan with the least overhang left, then the fewest chunks.
 - `--overhang` is the steepest overhang left uncut (default 50° from vertical), `--max-tilt` the largest chunk tilt (default 90°).
 - Inside a chunk the nozzle leans `--lean` degrees (default 15) toward each wall's outside and across infill lines, building up over `--ramp` mm from the chunk's base, so A and C move while printing. Wall loops pick the direction that turns C back toward 0, so C stays within about one turn.
-- Every pose is checked against the real toolhead and gantry beam from `config/models` (carriage and beam sampled into height columns) and against the platter, the tilt cradle, everything printed before and the layers already printed in the chunk. Where the lean would hit, it is reduced for that path, or the other A solution (−A with C + 180°) is used; chunk directions that hit even without lean are not used.
+- Every pose is checked against the real toolhead and gantry beam from `config/models` (carriage and beam sampled into height columns; the beam only across the carriage's width, because the `beam` group in the CAD reaches 3 mm above the nozzle along its whole length, which would hit the trunnion's side holders below Z 29 and can't be the real beam) and against the platter, the tilt cradle, everything printed before and the layers already printed in the chunk. Where the lean would hit, it is reduced for that path, or the other A solution (−A with C + 180°) is used; chunk directions that hit even without lean are not used.
 - Between chunks the nozzle retracts, rises above everything that will turn under the head, turns the table in 5° steps with the head held still, then comes down along the new tool axis. `BED_MESH_CLEAR` is sent before the first tilted chunk.
 
 Pivots, A limits and machine limits come from `config/printer/rotary.cfg` and the stepper configs. G-code X Y Z are part coordinates, as for `slice5.py`, and the output has the same `PRINT_START`, object and layer lines.
@@ -143,6 +143,7 @@ Pivots, A limits and machine limits come from `config/printer/rotary.cfg` and th
 | `lbracket` (post with an arm toward the front) | 2: the post, then the arm on a 45° cut | 272 | 60° | 2.1 h |
 | `ybranch` (trunk with two arms 30° above horizontal) | 3: the trunk, then each arm on a 30° cut | 252 | 45° | 1.6 h |
 | `tallmushroom` (stem with a wide cap) | 2: the stem, then the cap on a 45° cut | 260 | 60° | 2.1 h |
+| `tree` (holed base, trunk, six arms around it at six heights, a shelf and a cap) | 4: the base and trunk, then three cuts tilted toward three sides | 428 | 60° | 4.9 h |
 
 Each has no overhang left, the chunks add up to the model's volume, no pose hits the printer, and Kalico accepts the whole file with `twin.cfg` (from `PRINT_START` to `PRINT_END`, no refused moves). Load one in the twin's Mainsail to see the table tilt and turn under the toolpath.
 

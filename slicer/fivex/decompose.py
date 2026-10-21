@@ -37,7 +37,7 @@ def cut(mesh, origin, n):
     above, below = to_manifold(mesh).split_by_plane(tuple(n), float(np.dot(n, origin)))
     if below.is_empty() or above.is_empty():
         return None, []
-    return to_trimesh(below), [t for t in map(to_trimesh, above.decompose()) if t is not None]
+    return to_trimesh(below), [to_trimesh(above)]
 
 
 def base_faces(mesh, d, origin, eps=1e-3):
@@ -127,14 +127,16 @@ class Planner:
     def plan(self, mesh):
         if self.method != "hybrid":
             return self.plan_one(mesh, self.method)
-        plans = [self.plan_one(mesh, m) for m in ("overhang", "convex", "mixed")]
+        plans = [self.plan_one(mesh, m, w) for m in ("overhang", "convex", "mixed") for w in (0.0, 1.0)]
         return min(plans, key=lambda p: (round(sum(c.overhang for c in p), 1), len(p)))
 
-    def plan_one(self, mesh, method):
+    def plan_one(self, mesh, method, small=0.0):
         self.use = method
+        self.small = small
+        self.volume = mesh.volume
         self.total = mesh.area
         self.min_area = max(4.0, 0.002 * mesh.area)
-        self.chunk_cost = 0.01 * mesh.area
+        self.chunk_cost = 0.5 * self.min_area
         if method in ("convex", "mixed") and not self.convex:
             self.convex = convex_planes(mesh)
         if self.check:
@@ -207,6 +209,7 @@ class Planner:
             if any(a.volume < self.min_volume for a in aboves):
                 continue
             cost = overhang_area(below, d, o, self.sin_a) + self.chunk_cost * len(aboves)
+            cost += self.small * here * sum(a.volume for a in aboves) / self.volume
             cost += sum(overhang_area(a, n, po, self.sin_a) for a in aboves)
             if best is not None and cost >= best[0]:
                 continue
