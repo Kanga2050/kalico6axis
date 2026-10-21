@@ -652,21 +652,35 @@ export default class Viewer extends Mixins(BaseMixin) {
         const cancelTokenSource = CancelToken.source()
         this.downloadSnackbar.cancelTokenSource = cancelTokenSource
 
+        // Text, not a blob: Chrome refuses large blobs when the disk is nearly full
         const text = await axios
             .get(this.apiUrl + '/server/files/' + escapePath(filename), {
                 cancelToken: cancelTokenSource.token,
-                responseType: 'blob',
+                responseType: 'text',
+                transformResponse: (data) => data,
                 onDownloadProgress: (progressEvent: AxiosProgressEvent) => {
                     this.downloadSnackbar.percent = (progressEvent.progress ?? 0) * 100
                     this.downloadSnackbar.speed = progressEvent.rate ?? 0
                     this.downloadSnackbar.total = progressEvent.total ?? 0
                 },
             })
-            .then((res) => res.data.text())
+            .then((res) => res.data as string)
             .catch((e) => {
                 window.console.error(e.message)
+                if (!axios.isCancel(e)) {
+                    const msg = this.$t('GCodeViewer.DownloadFailed', {
+                        filename: this.downloadSnackbar.filename,
+                        error: e.message,
+                    })
+                    this.$toast.error(msg.toString())
+                }
+                return null
             })
         this.downloadSnackbar.status = false
+
+        // A failed download would otherwise render an empty file and crash the viewer
+        if (text === null) return
+
         this.loadedFile = this.downloadSnackbar.filename
 
         if (viewer === null) return
