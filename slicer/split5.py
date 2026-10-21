@@ -21,24 +21,31 @@ import time
 import numpy as np
 import trimesh
 
-from fivex.check import check
+from fivex.check import check, support
 from fivex.decompose import Planner
 from fivex.gcode import Writer
 from fivex.machine import Machine
-from fivex.toolpath import ChunkSlicer
+from fivex.toolpath import ChunkSlicer, samples
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def load(path, center):
+def load(path, center, machine):
     mesh = trimesh.load(path, force="mesh")
+    if not len(mesh.faces):
+        sys.exit("%s has no triangles" % path)
+    mesh.merge_vertices()
+    mesh.update_faces(mesh.nondegenerate_faces())
     if not mesh.is_watertight:
         trimesh.repair.fill_holes(mesh)
-        trimesh.repair.fix_normals(mesh)
-    if not mesh.is_watertight:
-        sys.exit("%s is not a closed mesh" % path)
+    trimesh.repair.fix_normals(mesh)
+    if not mesh.is_watertight or mesh.volume <= 0:
+        sys.exit("%s is not a closed mesh; repair it first" % path)
     lo, hi = mesh.bounds
     mesh.apply_translation((center[0] - (lo[0] + hi[0]) / 2, center[1] - (lo[1] + hi[1]) / 2, -lo[2]))
+    lo, hi = mesh.bounds
+    if (lo[:2] < 0).any() or (hi[:2] > machine.xy_max).any() or hi[2] > machine.z_max:
+        sys.exit("%s (%.0f x %.0f x %.0f mm) does not fit the printer" % ((path,) + tuple(hi - lo)))
     return mesh
 
 
@@ -61,6 +68,7 @@ def main():
     p.add_argument("--center", type=float, nargs=2)
     p.add_argument("--config", default=os.path.join(REPO, "config"))
     p.add_argument("--no-collisions", action="store_true")
+    p.add_argument("--no-supports", action="store_true", help="never add supports under overhangs no cut can fix")
     p.add_argument("--material", default="PLA")
     p.add_argument("--filament", type=float, default=1.75)
     g = p.parse_args()
@@ -69,10 +77,14 @@ def main():
     machine = Machine.from_config(g.config)
     if not g.no_collisions:
         machine.load_head(g.config)
-    mesh = load(g.stl, g.center or (machine.cx, machine.cy))
+    mesh = load(g.stl, g.center or (machine.cx, machine.cy), machine)
     chunks = Planner(machine, g.method, g.overhang, g.max_tilt, g.max_chunks).plan(mesh)
-    slicer = ChunkSlicer(g.layer, g.width, g.walls, g.infill, wall_speed=g.speed, infill_speed=g.infill_speed)
-    sliced = [(c,) + slicer.slice(c) for c in chunks]
+    slicer = ChunkSlicer(g.layer, g.width, g.walls, g.infill, wall_speed=g.speed, infill_speed=g.infill_speed,
+                         supports=not g.no_supports, overhang=g.overhang)
+    sliced, printed = [], np.zeros((0, 3))
+    for c in chunks:
+        sliced.append((c,) + slicer.slice(c, printed))
+        printed = np.vstack((printed, samples(sliced[-1][3])))
     total = sum(1 for _, _, _, layers in sliced for lay in layers if lay.paths)
 
     name = os.path.splitext(os.path.basename(g.stl))[0]
@@ -101,8 +113,20 @@ def main():
     for i, (c, _, _, layers) in enumerate(sliced):
         print("  chunk %d: direction %s, %.0f mm3, overhang left %.1f mm2" % (i + 1, np.round(c.d, 3), c.mesh.volume, c.overhang))
     left = sum(c.overhang for c in chunks)
-    if left > 0.01 * mesh.area:
-        print("  warning: %.0f mm2 of overhang is left without support; try --overhang, --max-tilt or another --method" % left)
+    held = sum(c.supported for c in chunks)
+    if held > 1.0:
+        print("  supports hold up %.0f mm2 that no cut could free" % held)
+    dropped = sum(c.dropped for c in chunks)
+    if dropped > 1.0:
+        print("  %.0f mm2 of slivers with nothing to stand on were left out" % dropped)
+    s = support(g.out)
+    if s["midair"]:
+        print("  warning: %.1f mm of extrusion has nothing within 2 mm under it; try --overhang, --max-tilt or another --method"
+              % (s["midair"] * s["step"]))
+    elif left > 0.01 * mesh.area and g.no_supports:
+        print("  warning: %.0f mm2 of overhang is left without support" % left)
+    if w.skipped:
+        print("  %d support lines the toolhead can't reach were left out" % w.skipped)
     print("  lean reduced on %d paths, A flipped on %d, collisions left %d" % (w.reduced, w.flipped, len(w.collisions)))
     for kind, layer, hit in w.collisions[:10]:
         print("    %s layer %d hits %s" % (kind, layer + 1, hit))
