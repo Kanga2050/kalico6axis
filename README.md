@@ -111,7 +111,10 @@ Limits: there are no real sensor readings, so endstops and probes trigger at the
 
 ```
 python slicer/slice5.py cube5.gcode --size 20 --tilt 20 --layer 0.3
+python slicer/slice5.py solid.gcode --size 15 --tilt 25 --infill 1
 ```
+
+`--infill 1` makes the cube solid: each layer is filled with straight lines with the nozzle leaning across them, and the lines turn 90° every layer, so C also swings between layers.
 
 It writes the object outline for adaptive meshing and the layer count, so Mainsail shows layer progress. Tested on the twin: a 20 mm cube at 20° (67 layers) prints through `PRINT_START` to `PRINT_END`, the motors' positions match the kinematics to under 0.01 mm, and the G-code viewer and 3D Printer panel show the table tilting and turning under the toolpath.
 
