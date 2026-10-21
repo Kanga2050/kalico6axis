@@ -1,0 +1,6 @@
+numpy
+scipy
+trimesh
+shapely>=2
+manifold3d
+coacd

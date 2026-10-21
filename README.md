@@ -11,7 +11,7 @@ Everything that runs my 5-axis printer (a Voron 2.4 350 with an A/C trunnion bed
 | `config/` | My printer config, with `printer/model.cfg` and the coloured CAD parts in `models/` | – |
 | `twin/` | The digital twin: the whole stack running on a PC with simulated MCUs | – |
 | `install/` | `publish.sh`, which builds the branches and release printers install | – |
-| `slicer/` | `slice5.py`, a 5-axis test slicer for the A/C trunnion | – |
+| `slicer/` | `split5.py`, the 5-axis slicer, and `slice5.py`, a cube test slicer, for the A/C trunnion | – |
 
 ## 3D model of the printer
 
@@ -118,12 +118,49 @@ python slicer/slice5.py solid.gcode --size 15 --tilt 25 --infill 1
 
 It writes the object outline for adaptive meshing and the layer count, so Mainsail shows layer progress. Tested on the twin: a 20 mm cube at 20° (67 layers) prints through `PRINT_START` to `PRINT_END`, the motors' positions match the kinematics to under 0.01 mm, and the G-code viewer and 3D Printer panel show the table tilting and turning under the toolpath.
 
+## 5-axis slicer
+
+`slicer/split5.py` slices any closed STL for the trunnion. Instead of deforming the model, it splits it with plane cuts into chunks that each print without supports from their own build direction. The first chunk grows on the bed; every other chunk grows on a cut face of what was printed before it, with its layers parallel to that face, so the table tilts it to face the nozzle.
+
+```
+python slicer/split5.py part.stl part.gcode
+python slicer/split5.py part.stl part.gcode --method overhang --lean 10 --layer 0.25
+```
+
+- `--method overhang` cuts where overhangs meet the body, trying planes through each overhang's root at 30° to 90° from the current build direction. `--method convex` cuts between the parts of a convex decomposition (CoACD), using the plane of each contact patch and the same tilts. `--method hybrid` (default) plans with both and with a mix of the two candidates, and keeps the plan with the least overhang left, then the fewest chunks.
+- `--overhang` is the steepest overhang left uncut (default 50° from vertical), `--max-tilt` the largest chunk tilt (default 90°).
+- Inside a chunk the nozzle leans `--lean` degrees (default 15) toward each wall's outside and across infill lines, building up over `--ramp` mm from the chunk's base, so A and C move while printing. Wall loops pick the direction that turns C back toward 0, so C stays within about one turn.
+- Every pose is checked against the real toolhead and gantry beam from `config/models` (carriage and beam sampled into height columns) and against the platter, the tilt cradle, everything printed before and the layers already printed in the chunk. Where the lean would hit, it is reduced for that path, or the other A solution (−A with C + 180°) is used; chunk directions that hit even without lean are not used.
+- Between chunks the nozzle retracts, rises above everything that will turn under the head, turns the table in 5° steps with the head held still, then comes down along the new tool axis. `BED_MESH_CLEAR` is sent before the first tilted chunk.
+
+Pivots, A limits and machine limits come from `config/printer/rotary.cfg` and the stepper configs. G-code X Y Z are part coordinates, as for `slice5.py`, and the output has the same `PRINT_START`, object and layer lines.
+
+`slicer/examples/` has test models (`make_examples.py` writes them) and their G-code:
+
+| Model | Chunks | Layers | Largest tilt while printing | Kalico print time |
+|---|---|---|---|---|
+| `tbracket` (post with a side arm) | 2: the post, then the arm on a 45° cut | 250 | 60° | 2.1 h |
+| `lbracket` (post with an arm toward the front) | 2: the post, then the arm on a 45° cut | 272 | 60° | 2.1 h |
+| `ybranch` (trunk with two arms 30° above horizontal) | 3: the trunk, then each arm on a 30° cut | 252 | 45° | 1.6 h |
+| `tallmushroom` (stem with a wide cap) | 2: the stem, then the cap on a 45° cut | 260 | 60° | 2.1 h |
+
+Each has no overhang left, the chunks add up to the model's volume, no pose hits the printer, and Kalico accepts the whole file with `twin.cfg` (from `PRINT_START` to `PRINT_END`, no refused moves). Load one in the twin's Mainsail to see the table tilt and turn under the toolpath.
+
+`arch.stl` and `mushroom.stl` are test models without G-code, because the arch's bridge and the low mushroom's cap stay as overhangs (the slicer warns about them). A single cut can't free the bridge without lifting a pillar off the bed, and a 20 mm high cap is too close to the platter to tilt for, so the toolhead would hit the bed. The tall mushroom shows the same cap printed on a 45° cut once there is room.
+
 ## Tests
 
 ```
 cd mainsail; npx vitest run                     # Mainsail: model joints, rotary maths, G-code A/B/C index
 docker exec printer-twin /opt/klippy-env/bin/python /opt/printer/tests/test_sim.py
 ```
+
+```
+python -m pytest slicer/tests                    # split5: maths vs corexy_ac, decomposition, toolpaths, G-code limits
+SPLIT5_DICTS=mcu=stm32f446.dict,nhk=rp2040.dict python -m pytest slicer/tests -k kalico
+```
+
+The slicer tests check its tool center point maths against `corexy_ac` itself, that each test model splits into the expected chunks with no overhang left and the same volume, that toolpaths stay inside their chunk, and that the G-code stays inside the machine and the A limits. With firmware dictionaries (`twin/sim/build_dict.py stm32f446xx stm32f446.dict`), the last test runs the G-code through Kalico in batch mode with this repo's config and `twin.cfg`, from `PRINT_START` to `PRINT_END`.
 
 The Mainsail tests check the browser's machine-position maths against Kalico's `corexy_ac` formula. The twin tests compare the simulated MCU with Kalico's own code: step timing, TMC UART frames, thermistor tables and config reading.
 
